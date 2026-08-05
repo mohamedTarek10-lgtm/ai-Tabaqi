@@ -1,0 +1,518 @@
+@import "tailwindcss";
+
+/* ============================================
+   TABAQI DESIGN SYSTEM
+   Purple-first, Arabic-first, premium SaaS
+   ============================================ */
+
+/* ---------- Font Faces ---------- */
+@font-face {
+  font-family: "NeueMetana";
+  src: url("/fonts/englishFontbtn/NeueMetanaMono-Light.otf") format("opentype");
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NeueMetana";
+  src: url("/fonts/englishFontbtn/NeueMetanaMono-SemiBold.otf") format("opentype");
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "InkBrush";
+  src: url("/fonts/arabicFont/alfont_com_InkBrushArabic_DEMO-Textured.otf") format("opentype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+/* ---------- CSS Tokens (Light Mode Default) ---------- */
+:root {
+  /* Brand */
+  --brand: #7c3aed;
+  --brand-light: #9f67fa;
+  --brand-dark: #5b21b6;
+  --brand-muted: #ede9fe;
+
+  /* Background layers */
+  --bg-page: #f5f3ff;
+  --bg-card: rgba(255, 255, 255, 0.72);
+  --bg-card-border: rgba(124, 58, 237, 0.12);
+  --bg-input: rgba(255, 255, 255, 0.8);
+  --bg-subtle: rgba(237, 233, 254, 0.5);
+
+  /* --- تعريف المتغيرات للألوان --- */
+:root {
+    /* ألوان الوضع المظلم (Dark Mode) */
+    --dark-ink: #000000;
+    --dark-midnight-1: #0D0261;
+    --dark-midnight-2: #121851;
+    --dark-navy: #001CD5;
+    --dark-wisteria: #B28FCE;
+
+    /* ألوان الوضع الفاتح (Light Mode) */
+    --light-white: #FFFFFF;
+    --light-skyblue: #78B8F9;
+    --light-ultramarine: #5667FF;
+    --light-iris: #4D2FF9;
+}
+
+/* --- تصميم الوضع المظلم --- */
+.dark-gradient-box {
+    background: linear-gradient(135deg, var(--dark-ink), var(--dark-midnight-1), var(--dark-midnight-2), var(--dark-navy), var(--dark-wisteria));
+    background-size: 400% 400%;
+    animation: rippleAnimation 8s ease infinite alternate;
+}
+
+/* --- تصميم الوضع الفاتح --- */
+.light-gradient-box {
+    background: linear-gradient(135deg, var(--light-white), var(--light-skyblue), var(--light-ultramarine), var(--light-iris));
+    background-size: 400% 400%;
+    animation: rippleAnimation 8s ease infinite alternate;
+}
+
+/* --- حركة التموج (Animation) --- */
+@keyframes rippleAnimation {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+  /* Text */
+  --text-primary: #1a0a3b;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --text-on-brand: #ffffff;
+
+  /* Macro colors */
+  --color-protein: #3b82f6;
+  --color-carbs: #f59e0b;
+  --color-fats: #f43f5e;
+  --color-calories: #7c3aed;
+
+  /* Glass */
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(124, 58, 237, 0.15);
+  --glass-shadow: 0 8px 32px rgba(124, 58, 237, 0.08), 0 2px 8px rgba(0,0,0,0.04);
+  --glass-blur: 20px;
+
+  /* Nav */
+  --nav-bg: rgba(255, 255, 255, 0.88);
+  --nav-border: rgba(124, 58, 237, 0.1);
+  --nav-active: #7c3aed;
+
+  /* Blob */
+  --blob-1: rgba(167, 139, 250, 0.35);
+  --blob-2: rgba(196, 181, 253, 0.25);
+  --blob-3: rgba(221, 214, 254, 0.2);
+
+  /* Radius */
+  --radius-card: 24px;
+  --radius-btn: 14px;
+  --radius-pill: 9999px;
+}
+
+/* ---------- Dark Mode ---------- */
+.dark {
+  --brand: #9f67fa;
+  --brand-light: #c4b5fd;
+  --brand-dark: #7c3aed;
+  --brand-muted: #2e1065;
+
+  --bg-page: #09080f;
+  --bg-card: rgba(20, 16, 36, 0.75);
+  --bg-card-border: rgba(159, 103, 250, 0.15);
+  --bg-input: rgba(30, 24, 50, 0.8);
+  --bg-subtle: rgba(46, 16, 101, 0.25);
+
+  --text-primary: #f5f3ff;
+  --text-secondary: #a78bfa;
+  --text-muted: #6b7280;
+  --text-on-brand: #ffffff;
+
+  --color-protein: #60a5fa;
+  --color-carbs: #fbbf24;
+  --color-fats: #fb7185;
+  --color-calories: #c4b5fd;
+
+  --glass-bg: rgba(20, 16, 36, 0.65);
+  --glass-border: rgba(159, 103, 250, 0.18);
+  --glass-shadow: 0 8px 40px rgba(124, 58, 237, 0.2), 0 2px 8px rgba(0,0,0,0.3);
+  --glass-blur: 24px;
+
+  --nav-bg: rgba(12, 10, 20, 0.9);
+  --nav-border: rgba(159, 103, 250, 0.12);
+  --nav-active: #9f67fa;
+
+  --blob-1: rgba(124, 58, 237, 0.2);
+  --blob-2: rgba(91, 33, 182, 0.15);
+  --blob-3: rgba(167, 139, 250, 0.08);
+}
+
+/* ---------- Base ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Font Utilities ---------- */
+.font-english {
+  font-family: "NeueMetana", monospace, sans-serif;
+}
+
+.font-arabic {
+  font-family: "InkBrush", "Segoe UI", Tahoma, sans-serif;
+}
+
+/* ---------- Background Blob System ---------- */
+.tabaqi-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tabaqi-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.7;
+  will-change: transform;
+  animation: blobDrift 18s ease-in-out infinite;
+}
+
+.tabaqi-blob-1 {
+  width: 500px;
+  height: 500px;
+  background: var(--blob-1);
+  top: -120px;
+  right: -80px;
+  animation-delay: 0s;
+  animation-duration: 20s;
+}
+
+.tabaqi-blob-2 {
+  width: 400px;
+  height: 400px;
+  background: var(--blob-2);
+  bottom: 10%;
+  left: -100px;
+  animation-delay: -7s;
+  animation-duration: 24s;
+}
+
+.tabaqi-blob-3 {
+  width: 300px;
+  height: 300px;
+  background: var(--blob-3);
+  top: 40%;
+  left: 50%;
+  transform: translateX(-50%);
+  animation-delay: -14s;
+  animation-duration: 16s;
+}
+
+@keyframes blobDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -40px) scale(1.05); }
+  66% { transform: translate(-20px, 20px) scale(0.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabaqi-blob { animation: none; }
+}
+
+/* ---------- Glass Card ---------- */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-card);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.glass-card:hover {
+  box-shadow: 0 12px 48px rgba(124, 58, 237, 0.14), 0 4px 16px rgba(0,0,0,0.06);
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+/* ---------- Upload Dropzone ---------- */
+.upload-zone {
+  border: 2px dashed var(--glass-border);
+  border-radius: 50% / 38%;
+  background: var(--bg-subtle);
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.upload-zone:hover,
+.upload-zone.drag-active {
+  border-color: var(--brand);
+  background: rgba(124, 58, 237, 0.06);
+  box-shadow: 0 0 0 6px rgba(124, 58, 237, 0.06);
+}
+
+/* ---------- Buttons ---------- */
+.btn-primary {
+  background: var(--brand);
+  color: var(--text-on-brand);
+  border: none;
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--brand-light);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1.5px solid var(--glass-border);
+  border-radius: var(--radius-btn);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: rgba(124, 58, 237, 0.04);
+}
+
+.btn-outline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------- Macro Cards ---------- */
+.macro-card {
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+  border: 1px solid;
+  transition: transform 0.2s ease;
+}
+
+.macro-card:hover {
+  transform: translateY(-2px);
+}
+
+.macro-card-protein {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.2);
+  color: var(--color-protein);
+}
+
+.macro-card-carbs {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.2);
+  color: var(--color-carbs);
+}
+
+.macro-card-fats {
+  background: rgba(244, 63, 94, 0.08);
+  border-color: rgba(244, 63, 94, 0.2);
+  color: var(--color-fats);
+}
+
+.macro-card-calories {
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.2);
+  color: var(--color-calories);
+}
+
+/* ---------- Bottom Navigation (mobile) ---------- */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--nav-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--nav-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 10px 0 max(10px, env(safe-area-inset-bottom));
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 16px;
+  border-radius: 12px;
+  transition: color 0.2s ease;
+  text-decoration: none;
+  border: none;
+  background: none;
+}
+
+.bottom-nav-item.active {
+  color: var(--nav-active);
+}
+
+.bottom-nav-item .nav-icon-wrap {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s ease;
+}
+
+.bottom-nav-item.active .nav-icon-wrap {
+  background: rgba(124, 58, 237, 0.12);
+}
+
+.bottom-nav-item.nav-add .nav-icon-wrap {
+  background: var(--brand);
+  color: white;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
+}
+
+/* ---------- Confidence Badge ---------- */
+.confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+}
+
+.confidence-high {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.confidence-medium {
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+}
+
+.confidence-low {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+/* ---------- Loading Spinner ---------- */
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(124, 58, 237, 0.2);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Fade-in Animation ---------- */
+.fade-in {
+  animation: fadeIn 0.4s ease both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in-delay-1 { animation-delay: 0.08s; }
+.fade-in-delay-2 { animation-delay: 0.16s; }
+.fade-in-delay-3 { animation-delay: 0.24s; }
+.fade-in-delay-4 { animation-delay: 0.32s; }
+
+/* ---------- History List ---------- */
+.meal-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.meal-row:hover {
+  border-color: var(--brand);
+  background: rgba(124, 58, 237, 0.04);
+  transform: translateX(-2px);
+}
+
+.meal-thumbnail {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--bg-subtle);
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(124, 58, 237, 0.3); border-radius: 3px; }
+
+/* ---------- Selection ---------- */
+::selection { background: rgba(124, 58, 237, 0.25); color: inherit; }
