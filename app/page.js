@@ -167,7 +167,7 @@ export default function Home() {
               lineHeight: 1.25,
             }}
           >
-            اعرف أكلك !
+       اعرف اكلك
           </h1>
 
           <p
@@ -177,7 +177,7 @@ export default function Home() {
               marginBottom: "32px",
             }}
           >
-            صوّر طبقك، واعرف تفاصيله.
+  صوّر طبقك واعرف تفاصيله
           </p>
 
           {/* Drop Zone / Preview */}
@@ -206,7 +206,7 @@ export default function Home() {
                   width: "68px",
                   height: "68px",
                   borderRadius: "50%",
-                  background: "black",
+                  background: "var(--brand)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",

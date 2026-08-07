@@ -1,6 +1,14 @@
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 
-const sql = neon(process.env.DATABASE_URL);
+const databaseUrl = process.env.DATABASE_URL;
 
-export const db = drizzle(sql);
+export const isDatabaseConfigured = Boolean(
+  databaseUrl &&
+    !databaseUrl.includes("user:password") &&
+    !databaseUrl.includes("ep-cool-name")
+);
+
+const sql = isDatabaseConfigured ? neon(databaseUrl) : null;
+
+export const db = sql ? drizzle(sql) : null;

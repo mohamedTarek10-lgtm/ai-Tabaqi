@@ -1,6 +1,8 @@
 import { ClerkProvider, SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 import "./globals.css";
 import Link from "next/link";
+import MobileNavigation from "./mobile-navigation";
+import ThemeToggle from "./theme-toggle";
 
 export const metadata = {
   title: "Tabaqi — اعرف أكلك فيه إيه",
@@ -22,6 +24,14 @@ export default function RootLayout({ children }) {
             <div className="tabaqi-blob tabaqi-blob-2" />
             <div className="tabaqi-blob tabaqi-blob-3" />
           </div>
+
+          <header className="mobile-header mobile-only">
+            <div className="mobile-brand" aria-label="Tabaqi طبقي">
+              <span>طبقي</span>
+              <span className="font-english">Tabaqi</span>
+            </div>
+            <ThemeToggle />
+          </header>
 
           {/* Desktop Top Navbar — hidden on mobile */}
           <header
@@ -66,6 +76,7 @@ export default function RootLayout({ children }) {
 
             {/* Left: Auth */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <ThemeToggle />
               <Show when="signed-out">
                 <SignInButton mode="modal">
                   <button
@@ -109,6 +120,7 @@ export default function RootLayout({ children }) {
           </div>
 
           {/* Mobile Bottom Navigation */}
+          <MobileNavigation />
           <nav className="bottom-nav mobile-only" aria-label="التنقل الرئيسي">
             <Link href="/" className="bottom-nav-item" id="nav-home">
               <span className="nav-icon-wrap">
@@ -143,24 +155,9 @@ export default function RootLayout({ children }) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                 </svg>
               </span>
-              <span>الملف</span>
+              <span>ملفك الشخصي</span>
             </Link>
           </nav>
-
-          {/* Active nav highlighting script */}
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
-                (function() {
-                  var path = window.location.pathname;
-                  var map = { '/': 'nav-home', '/history': 'nav-history', '/profile': 'nav-profile' };
-                  var id = map[path] || 'nav-home';
-                  var el = document.getElementById(id);
-                  if (el) el.classList.add('active');
-                })();
-              `,
-            }}
-          />
 
           {/* Responsive: show desktop nav on large screens */}
           <style>{`
@@ -169,6 +166,7 @@ export default function RootLayout({ children }) {
               .mobile-only { display: none !important; }
               .page-wrapper { padding-top: 64px; padding-bottom: 0; }
             }
+            .bottom-nav:has(#nav-home) { display: none !important; }
           `}</style>
         </ClerkProvider>
       </body>

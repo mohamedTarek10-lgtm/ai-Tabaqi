@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/config/db";
+import { db, isDatabaseConfigured } from "@/config/db";
 import { meals } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 
 // GET /api/meals — returns authenticated user's meals
 export async function GET() {
   try {
+    if (!isDatabaseConfigured) {
+      return NextResponse.json(
+        { error: "قاعدة البيانات غير مُعدة بعد. أضف رابط Neon الصحيح في DATABASE_URL." },
+        { status: 503 }
+      );
+    }
+
     const { userId } = await auth();
 
     if (!userId) {

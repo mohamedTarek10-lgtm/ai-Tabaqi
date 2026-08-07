@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 
-import { db } from "@/config/db";
+import { db, isDatabaseConfigured } from "@/config/db";
 import { meals } from "@/db/schema";
 
 const SYSTEM_PROMPT = `
@@ -155,6 +155,13 @@ The goal is fast, structured and useful results for Tabaqi.
 
 export async function POST(req) {
   try {
+    if (!isDatabaseConfigured) {
+      return NextResponse.json(
+        { error: "قاعدة البيانات غير مُعدة بعد. أضف رابط Neon الصحيح في DATABASE_URL." },
+        { status: 503 }
+      );
+    }
+
     // ==============================
     // 1. Check Clerk authentication
     // ==============================
