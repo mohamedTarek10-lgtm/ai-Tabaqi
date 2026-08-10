@@ -20,12 +20,14 @@ IMPORTANT LANGUAGE RULES:
 EGYPTIAN FOOD KNOWLEDGE:
 
 You should recognize common Egyptian foods such as:
-
+- طاجن
+-حواوشي
 - كشري
 - فول
 - طعمية / فلافل
 - ملوخية
 - محشي
+- حواوشي
 - فتة
 - مسقعة
 - بامية
@@ -239,12 +241,14 @@ export async function POST(req) {
         headers: {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
+          "HTTP-Referer": "http://localhost:3002",
+          "X-Title": "Tabaqi App",
         },
 
         body: JSON.stringify({
           model:
             process.env.OPENROUTER_MODEL ||
-            "google/gemma-4-26b-a4b-it:free",
+            "google/gemini-2.0-flash-lite-preview-02-05:free",
 
           messages: [
             {
@@ -317,10 +321,14 @@ export async function POST(req) {
     // 7. Clean AI response
     // ==============================
 
-    const cleanedContent = content
-      .replace(/```json/gi, "")
-      .replace(/```/g, "")
-      .trim();
+    // تنظيف النتيجة لاستخراج كائن JSON فقط بدقة
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const cleanedContent = jsonMatch
+      ? jsonMatch[0]
+      : content
+          .replace(/```json/gi, "")
+          .replace(/```/g, "")
+          .trim();
 
     let result;
 

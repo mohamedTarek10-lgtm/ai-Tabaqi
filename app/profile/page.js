@@ -10,12 +10,25 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!isSignedIn) return;
+
+    let isMounted = true;
     fetch("/api/meals")
       .then((r) => r.json())
-      .then((d) => setMealCount(d.meals?.length ?? 0))
-      .catch(() => {});
+      .then((d) => {
+        if (isMounted) {
+          setMealCount(d.meals?.length ?? 0);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch meals:", err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [isSignedIn]);
 
+  // 1. حالة التحميل
   if (!isLoaded) {
     return (
       <div
@@ -31,6 +44,7 @@ export default function ProfilePage() {
     );
   }
 
+  // 2. حالة عدم تسجيل الدخول
   if (!isSignedIn) {
     return (
       <div
@@ -71,7 +85,7 @@ export default function ProfilePage() {
           <SignInButton mode="modal">
             <button
               className="btn-primary"
-              style={{ width: "100%", height: "48px", fontSize: "15px" }}
+              style={{ width: "100%", height: "48px", fontSize: "15px", cursor: "pointer" }}
             >
               سجل دخول
             </button>
@@ -81,6 +95,7 @@ export default function ProfilePage() {
     );
   }
 
+  // 3. حالة المستخدم المسجل
   return (
     <div style={{ minHeight: "80dvh", padding: "24px 16px" }}>
       <div style={{ maxWidth: "480px", margin: "0 auto" }}>
@@ -96,7 +111,7 @@ export default function ProfilePage() {
           الملف الشخصي
         </h1>
 
-        {/* Profile card */}
+        {/* كارت البيانات الشخصية */}
         <div
           className="glass-card fade-in"
           style={{
@@ -107,9 +122,8 @@ export default function ProfilePage() {
             gap: "20px",
           }}
         >
-          {/* Avatar via Clerk UserButton */}
           <div>
-            <UserButton />
+            <UserButton afterSignOutUrl="/" />
           </div>
 
           <div style={{ flex: 1 }}>
@@ -121,15 +135,15 @@ export default function ProfilePage() {
                 marginBottom: "4px",
               }}
             >
-              {user.fullName || user.username || "مستخدم طبقي"}
+              {user?.fullName || user?.username || "مستخدم طبقي"}
             </p>
             <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-              {user.primaryEmailAddress?.emailAddress}
+              {user?.primaryEmailAddress?.emailAddress}
             </p>
           </div>
         </div>
 
-        {/* Stats card */}
+        {/* كارت الإحصائيات */}
         <div
           className="glass-card fade-in fade-in-delay-1"
           style={{ padding: "20px 24px", marginBottom: "16px" }}
@@ -165,10 +179,10 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Quick links */}
+        {/* الروابط السريعة */}
         <div
           className="glass-card fade-in fade-in-delay-2"
-          style={{ padding: "8px 8px" }}
+          style={{ padding: "8px" }}
         >
           <Link
             href="/history"
@@ -213,7 +227,7 @@ export default function ProfilePage() {
               stroke="var(--text-muted)"
               strokeWidth="2"
               viewBox="0 0 24 24"
-              style={{ marginRight: "auto" }}
+              style={{ marginInlineStart: "auto" }}
             >
               <path
                 strokeLinecap="round"
@@ -271,7 +285,7 @@ export default function ProfilePage() {
               stroke="var(--text-muted)"
               strokeWidth="2"
               viewBox="0 0 24 24"
-              style={{ marginRight: "auto" }}
+              style={{ marginInlineStart: "auto" }}
             >
               <path
                 strokeLinecap="round"
