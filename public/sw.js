@@ -1,99 +1,110 @@
-const CACHE_NAME = "luqmati-v1";
+const CACHE_NAME = "luqmati-shell-v2";
 const OFFLINE_URL = "/offline.html";
 
-const ASSETS_TO_CACHE = [
+const APP_SHELL = [
   "/",
   "/history",
   "/profile",
   "/offline.html",
-  "/favicon.ico",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png",
 ];
 
-// Install: Cache app shell & offline fallback page
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // A single route failing during install must not make the whole PWA
+      // unusable. Successful routes and assets are still retained.
+      await Promise.allSettled(APP_SHELL.map((asset) => cache.add(asset)));
     })
   );
   self.skipWaiting();
 });
 
-// Activate: Clean up old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    })
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Fetch: Strategy
+function isSameOrigin(request) {
+  return new URL(request.url).origin === self.location.origin;
+}
+
+function offlineAnalysisResponse() {
+  return new Response(
+    JSON.stringify({
+      error: "Internet connection is required to analyze a new meal.",
+      offline: true,
+    }),
+    { status: 503, headers: { "Content-Type": "application/json" } }
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+  if (!isSameOrigin(request)) return;
 
-  // Never attempt offline caching for new food analysis — AI requires internet!
-  if (request.url.includes("/api/analyze-food")) {
-    event.respondWith(
-      fetch(request).catch(() => {
-        return new Response(
-          JSON.stringify({
-            error: "تحليل الأكل الجديد محتاج اتصال بالإنترنت. اتصل بالإنترنت وحاول تاني.",
-            offline: true,
-          }),
-          {
-            status: 503,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-      })
-    );
+  const url = new URL(request.url);
+
+  // Never cache private APIs or upload bodies. Offline analysis gets an
+  // explicit response so the UI can show a retryable message immediately.
+  if (url.pathname === "/api/analyze-food") {
+    event.respondWith(fetch(request).catch(() => offlineAnalysisResponse()));
     return;
   }
+  if (url.pathname.startsWith("/api/")) return;
 
-  // Network-first for Meals API history fetch, with cache fallback
-  if (request.url.includes("/api/meals")) {
+  if (request.method !== "GET") return;
+
+  // Static Next assets are immutable and safe to cache for the app shell.
+  if (url.pathname.startsWith("/_next/static/") || request.destination === "font" || request.destination === "image") {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.status === 200) {
+      caches.match(request).then((cached) =>
+        cached ||
+        fetch(request).then((response) => {
+          if (response.ok) {
             const copy = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           }
           return response;
         })
-        .catch(() => caches.match(request))
+      )
     );
     return;
   }
 
-  // Stale-while-revalidate for page navigation and static assets
+  // Network-first navigation keeps the app fresh, then serves the previously
+  // visited shell. The offline page is the final fallback for a cold route.
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(() => {
-        return caches.match(request).then((cached) => {
-          return cached || caches.match(OFFLINE_URL);
-        });
-      })
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match(OFFLINE_URL)))
     );
     return;
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      return (
-        cached ||
-        fetch(request).then((response) => {
-          return response;
-        })
-      );
-    })
+    caches.match(request).then((cached) =>
+      cached ||
+      fetch(request).then((response) => {
+        if (response.ok && response.type === "basic") {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      })
+    )
   );
 });

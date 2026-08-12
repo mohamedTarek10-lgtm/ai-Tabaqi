@@ -98,7 +98,7 @@ export default function ProfilePage() {
           </p>
           <div style={{ display: "flex", gap: "32px" }}>
             <div>
-              <div className="font-english" style={{ fontSize: "34px", fontWeight: 800, color: "var(--brand)", lineHeight: 1 }}>
+              <div className="english-font" style={{ fontSize: "34px", fontWeight: 800, color: "var(--brand)", lineHeight: 1 }}>
                 {mealCount ?? "…"}
               </div>
               <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>

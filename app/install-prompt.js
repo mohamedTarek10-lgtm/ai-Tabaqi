@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { useLang } from "./i18n-context";
 
 export default function InstallPrompt() {
   const { t, lang } = useLang();
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showIOSHint, setShowIOSHint] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const isStandalone = useSyncExternalStore(
+    () => () => {},
+    () => window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true,
+    () => false,
+  );
 
   useEffect(() => {
     // Check if already running as installed standalone app
@@ -15,7 +19,6 @@ export default function InstallPrompt() {
       window.matchMedia("(display-mode: standalone)").matches ||
       window.navigator.standalone === true
     ) {
-      setIsStandalone(true);
       return;
     }
 
@@ -53,7 +56,7 @@ export default function InstallPrompt() {
       alert(
         lang === "ar"
           ? "لتثبيت التطبيق: افتح قائمة المتصفح واختر 'إضافة إلى الشاشة الرئيسية' أو 'Install App'."
-          : "To install: open your browser menu and select 'Add to Home Screen' or 'Install App'.",
+                  : "To install: open your browser menu and select ‘Add to Home Screen’ or ‘Install App’.",
       );
     }
   }
@@ -196,7 +199,7 @@ export default function InstallPrompt() {
               <p>
                 2️⃣ اختر{" "}
                 <strong>
-                  "إضافة إلى الشاشة الرئيسية" (Add to Home Screen ➕)
+                  &quot;إضافة إلى الشاشة الرئيسية&quot; (Add to Home Screen ➕)
                 </strong>
                 .
               </p>

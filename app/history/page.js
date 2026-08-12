@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useAuth, SignInButton } from "@clerk/nextjs";
+import Link from "next/link";
 import { useLang } from "../i18n-context";
 
 // Group meals by relative date label
@@ -32,37 +33,41 @@ function confColor(c) {
   return "#ef4444";
 }
 
+function subscribeToOnlineStatus(callback) {
+  window.addEventListener("online", callback);
+  window.addEventListener("offline", callback);
+  return () => {
+    window.removeEventListener("online", callback);
+    window.removeEventListener("offline", callback);
+  };
+}
+
+function getOnlineStatus() {
+  return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
 export default function HistoryPage() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, userId } = useAuth();
   const { t, lang } = useLang();
   const [meals, setMeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isOffline, setIsOffline] = useState(false);
-
-  useEffect(() => {
-    setIsOffline(!navigator.onLine);
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
+  const isOffline = !useSyncExternalStore(subscribeToOnlineStatus, getOnlineStatus, () => true);
 
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) {
-      setLoading(false);
       return;
     }
 
-    // Try loading offline cache first
-    const cached = localStorage.getItem("luqmati-meals-cache");
+    // Keep offline history isolated per authenticated Clerk user. A shared
+    // cache key could show one user's meals to another user on the same device.
+    const cacheKey = userId ? `luqmati-meals-cache:${userId}` : null;
+    const cached = cacheKey ? localStorage.getItem(cacheKey) : null;
     if (cached) {
       try {
+        // Hydrate the per-user snapshot before attempting the network refresh.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMeals(JSON.parse(cached));
         setLoading(false);
       } catch (e) {}
@@ -76,7 +81,7 @@ export default function HistoryPage() {
         const fetched = data.meals || [];
         setMeals(fetched);
         // Cache for offline history access
-        localStorage.setItem("luqmati-meals-cache", JSON.stringify(fetched));
+        if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(fetched));
       } catch (err) {
         if (!cached) setError(err.message);
       } finally {
@@ -89,10 +94,10 @@ export default function HistoryPage() {
     } else {
       setLoading(false);
     }
-  }, [isLoaded, isSignedIn, t.analysisError]);
+  }, [isLoaded, isSignedIn, userId, t.analysisError]);
 
   // ── Not Signed In ─────────────────────────────────────────────────────────
-  if (isLoaded && !isSignedIn) {
+    if (isLoaded && !isSignedIn) {
     return (
       <div style={{ minHeight: "80dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", textAlign: "center" }}>
         <div className="glass-card fade-in" style={{ padding: "40px 28px", maxWidth: "380px", width: "100%" }}>
@@ -153,9 +158,9 @@ export default function HistoryPage() {
         <p style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "24px" }}>
           {t.historyEmptyHint}
         </p>
-        <a href="/" className="btn-primary" style={{ padding: "12px 28px", fontSize: "15px", textDecoration: "none" }}>
+        <Link href="/" className="btn-primary" style={{ padding: "12px 28px", fontSize: "15px", textDecoration: "none" }}>
           {t.btnAnalyzeNow}
-        </a>
+        </Link>
       </div>
     );
   }
@@ -227,7 +232,7 @@ export default function HistoryPage() {
 
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--text-secondary)" }}>
                         <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: confColor(meal.confidence), flexShrink: 0 }} />
-                        <span className="font-english">{meal.calories ?? "—"} {t.kcal}</span>
+                        <span className="english-font">{meal.calories ?? "—"} {t.kcal}</span>
                         <span>·</span>
                         <span>{time}</span>
                       </div>

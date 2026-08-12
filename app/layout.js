@@ -72,7 +72,10 @@ export const metadata = {
     title: "لقمتي Luqmati",
   },
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
     apple: "/apple-touch-icon.png",
   },
 };
@@ -98,7 +101,8 @@ export default function RootLayout({ children }) {
     <html lang="ar" dir="rtl" suppressHydrationWarning style={{ scrollBehavior: "smooth" }}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#06040f" />
+        <meta id="theme-color-meta" name="theme-color" content="#06040f" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f0f0fa" />
         <Script
           id="json-ld"
           type="application/ld+json"

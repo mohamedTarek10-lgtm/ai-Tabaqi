@@ -24,7 +24,7 @@ export function HeaderNav() {
       <header className="mobile-header mobile-only">
         <Link href="/" className="mobile-brand" aria-label="Luqmati لقمتي" style={{ textDecoration: "none" }}>
           <span className="font-arabic">لقمتي</span>
-          <span className="font-english">Luqmati</span>
+          <span className="english-font">Luqmati</span>
         </Link>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -49,7 +49,7 @@ export function HeaderNav() {
           <span className="font-arabic" style={{ fontSize: "26px", fontWeight: 700, color: "var(--brand)" }}>
             لقمتي
           </span>
-          <span className="font-english" style={{ fontSize: "20px", fontWeight: 600, color: "var(--brand)", letterSpacing: "-0.5px" }}>
+          <span className="english-font" style={{ fontSize: "20px", fontWeight: 600, color: "var(--brand)", letterSpacing: "-0.5px" }}>
             Luqmati
           </span>
         </Link>

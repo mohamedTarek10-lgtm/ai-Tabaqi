@@ -1,10 +1,60 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useSyncExternalStore } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useLang } from "./i18n-context";
 import ProteinRing from "./protein-ring";
 import InstallPrompt from "./install-prompt";
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const PROVIDER_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp)$/i;
+
+function subscribeToOnlineStatus(callback) {
+  window.addEventListener("online", callback);
+  window.addEventListener("offline", callback);
+  return () => {
+    window.removeEventListener("online", callback);
+    window.removeEventListener("offline", callback);
+  };
+}
+
+function getOnlineStatus() {
+  return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
+async function convertToProviderImage(file) {
+  if (PROVIDER_IMAGE_TYPES.has(file.type)) return file;
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    image.src = objectUrl;
+    await image.decode();
+
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 2400 / Math.max(image.naturalWidth, image.naturalHeight));
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    if (!blob) throw new Error("conversion_failed");
+
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
 
 function confidenceLabel(c, t) {
   if (c === "high")
@@ -32,7 +82,7 @@ function MacroCard({ emoji, label, value, unit, colorClass, delay }) {
         {label}
       </div>
       <div
-        className="font-english"
+        className="english-font"
         style={{ fontSize: "22px", fontWeight: 700, lineHeight: 1.1 }}
       >
         {value ?? "—"}
@@ -64,7 +114,7 @@ export default function Home() {
   const [usage, setUsage] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const isOffline = !useSyncExternalStore(subscribeToOnlineStatus, getOnlineStatus, () => true);
 
   // Manual ingredient edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -77,19 +127,6 @@ export default function Home() {
   const fileInput = useRef(null);
   const cameraInput = useRef(null);
 
-  // ── Online / Offline listener ──────────────────────────────────────────────
-  useEffect(() => {
-    setIsOffline(!navigator.onLine);
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
-
   // ── Usage counter fetch ──────────────────────────────────────────────────
   useEffect(() => {
     if (!isSignedIn) return;
@@ -101,36 +138,48 @@ export default function Home() {
 
   // ── Sync editable ingredients when result arrives ───────────────────────
   useEffect(() => {
-    if (result?.ingredients) {
-      setEditableIngredients([...result.ingredients]);
-    }
-  }, [result]);
+    return () => {
+      if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
 
   // ── File validation & handle ─────────────────────────────────────────────
-  function handleFile(f) {
-    if (!f || !f.type.startsWith("image/")) {
+  const handleFile = useCallback(async function handleFile(f) {
+    if (!f || (!f.type.startsWith("image/") && !IMAGE_EXTENSIONS.test(f.name))) {
       setError(t.notAnImage);
       return;
     }
-    if (f.size > 10 * 1024 * 1024) {
+    if (f.size > MAX_IMAGE_BYTES) {
       setError(t.imageTooLarge);
       return;
     }
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
-    setResult(null);
-    setError("");
-    setSaved(false);
-    setRateLimitInfo(null);
-    setIsEditing(false);
-  }
 
-  const onFileInput = (e) => handleFile(e.target.files?.[0]);
+    try {
+      const preparedFile = await convertToProviderImage(f);
+      if (preparedFile.size > MAX_IMAGE_BYTES) {
+        setError(t.imageTooLarge);
+        return;
+      }
+      setFile(preparedFile);
+      setPreview(URL.createObjectURL(preparedFile));
+      setResult(null);
+      setError("");
+      setSaved(false);
+      setRateLimitInfo(null);
+      setIsEditing(false);
+    } catch {
+      setError(t.imageConversionFailed);
+    }
+  }, [t]);
+
+  const onFileInput = (e) => {
+    void handleFile(e.target.files?.[0]);
+  };
   const onDrop = useCallback((e) => {
     e.preventDefault();
     setDragOver(false);
-    handleFile(e.dataTransfer.files?.[0]);
-  }, []);
+    void handleFile(e.dataTransfer.files?.[0]);
+  }, [handleFile]);
   const onDragOver = (e) => {
     e.preventDefault();
     setDragOver(true);
@@ -159,19 +208,28 @@ export default function Home() {
       setSaved(false);
       setRateLimitInfo(null);
 
-      setAnalyzingStep("جاري تجهيز الصورة...");
+      setAnalyzingStep(t.preparingImage);
       await new Promise((r) => setTimeout(r, 300));
-      setAnalyzingStep("جاري التعرف على مكونات الطبق بالذكاء الاصطناعي...");
+      setAnalyzingStep(t.aiAnalyzing);
 
       const form = new FormData();
       form.append("image", file);
 
-      const res = await fetch("/api/analyze-food", {
-        method: "POST",
-        body: form,
-      });
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 60_000);
 
-      const data = await res.json();
+      let res;
+      try {
+        res = await fetch("/api/analyze-food", {
+          method: "POST",
+          body: form,
+          signal: controller.signal,
+        });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+
+      const data = await res.json().catch(() => ({}));
 
       if (res.status === 429) {
         setRateLimitInfo({
@@ -182,14 +240,21 @@ export default function Home() {
       }
 
       if (!res.ok) {
-        throw new Error(data.error || t.analysisError);
+        throw new Error(data.offline ? t.offlineAnalysisMsg : data.error || t.analysisError);
       }
 
       setResult(data.result);
+      setEditableIngredients(data.result?.ingredients || []);
       if (data.usage) setUsage(data.usage);
       setSaved(true);
     } catch (err) {
-      setError(err.message || t.analysisError);
+      if (err?.name === "AbortError") {
+        setError(t.analysisTimeout);
+      } else if (!navigator.onLine || err?.name === "TypeError") {
+        setError(t.offlineAnalysisMsg);
+      } else {
+        setError(err.message || t.analysisError);
+      }
     } finally {
       setLoading(false);
       setAnalyzingStep("");
@@ -492,14 +557,14 @@ export default function Home() {
           <input
             ref={fileInput}
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif,.avif,.bmp"
             onChange={onFileInput}
             style={{ display: "none" }}
           />
           <input
             ref={cameraInput}
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif,.avif,.bmp"
             capture="environment"
             onChange={onFileInput}
             style={{ display: "none" }}
@@ -521,6 +586,16 @@ export default function Home() {
               }}
             >
               <p>{error}</p>
+              {file && !loading && !rateLimitInfo && (
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={analyzeFood}
+                  style={{ marginTop: "10px", padding: "7px 14px", fontSize: "12px" }}
+                >
+                  {t.btnRetry}
+                </button>
+              )}
               {rateLimitInfo?.resetAt && (
                 <p
                   style={{
@@ -740,7 +815,7 @@ export default function Home() {
                 }}
               >
                 <span
-                  className="font-english"
+                  className="english-font"
                   style={{
                     background: "rgba(108,63,212,0.85)",
                     color: "white",
@@ -875,7 +950,7 @@ export default function Home() {
                   {t.calories}
                 </div>
                 <div
-                  className="font-english"
+                    className="english-font"
                   style={{
                     fontSize: "36px",
                     fontWeight: 800,
@@ -1039,7 +1114,7 @@ export default function Home() {
                     >
                       {ing.estimatedGrams && (
                         <span
-                          className="font-english"
+                          className="english-font"
                           style={{
                             fontSize: "12px",
                             color: "var(--text-secondary)",

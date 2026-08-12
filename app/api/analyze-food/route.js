@@ -5,6 +5,18 @@ import { db, isDatabaseConfigured } from "@/config/db";
 import { meals } from "@/db/schema";
 import { eq, and, gte, count } from "drizzle-orm";
 
+export const runtime = "nodejs";
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const OPENROUTER_TIMEOUT_MS = 45_000;
+const FALLBACK_MODEL = "google/gemini-2.5-flash";
+const PROVIDER_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
 // ── Rate limit constants ────────────────────────────────────────────────────
 const ANALYSIS_LIMIT = 3;
 const ANALYSIS_WINDOW_MS = 5 * 60 * 60 * 1000; // 5 hours
@@ -164,9 +176,138 @@ The goal is fast, structured and useful results for Luqmati.
 `;
 
 // Helper to call OpenRouter API
+function detectImageType(bytes) {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+
+  if (
+    bytes.length >= 12 &&
+    String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
+    String.fromCharCode(...bytes.slice(8, 12)) === "WEBP"
+  ) {
+    return "image/webp";
+  }
+
+  if (
+    bytes.length >= 6 &&
+    ["GIF87a", "GIF89a"].includes(String.fromCharCode(...bytes.slice(0, 6)))
+  ) {
+    return "image/gif";
+  }
+
+  // HEIC/HEIF files use an ISO Base Media File Format container. They must be
+  // converted before they reach OpenRouter, which accepts jpeg/png/webp/gif.
+  if (bytes.length >= 12 && String.fromCharCode(...bytes.slice(4, 8)) === "ftyp") {
+    const brand = String.fromCharCode(...bytes.slice(8, 12));
+    if (["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(brand)) {
+      return "image/heic";
+    }
+  }
+
+  return null;
+}
+
+function getAssistantText(content) {
+  if (typeof content === "string") return content.trim();
+  if (Array.isArray(content)) {
+    return content
+      .filter((part) => typeof part?.text === "string")
+      .map((part) => part.text)
+      .join("\n")
+      .trim();
+  }
+  return "";
+}
+
+function extractJson(text) {
+  const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < cleaned.length; i += 1) {
+    const char = cleaned[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === "{") {
+      if (start === -1) start = i;
+      depth += 1;
+    } else if (char === "}" && start !== -1) {
+      depth -= 1;
+      if (depth === 0) return cleaned.slice(start, i + 1);
+    }
+  }
+
+  return cleaned;
+}
+
+function finiteNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function normalizeResult(result) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) {
+    throw new Error("AI response was not an object");
+  }
+
+  return {
+    foodName: String(result.foodName || "Unknown").slice(0, 160),
+    foodNameArabic: result.foodNameArabic ? String(result.foodNameArabic).slice(0, 160) : "",
+    descriptionArabic: result.descriptionArabic ? String(result.descriptionArabic).slice(0, 500) : "",
+    portion: {
+      size: result.portion?.size ? String(result.portion.size).slice(0, 80) : "",
+      estimatedGrams: Math.max(0, Math.round(finiteNumber(result.portion?.estimatedGrams))),
+    },
+    calories: Math.max(0, Math.round(finiteNumber(result.calories))),
+    protein: Math.max(0, finiteNumber(result.protein)),
+    carbs: Math.max(0, finiteNumber(result.carbs)),
+    fats: Math.max(0, finiteNumber(result.fats)),
+    proteinNote: result.proteinNote ? String(result.proteinNote).slice(0, 500) : "",
+    ingredients: Array.isArray(result.ingredients)
+      ? result.ingredients.slice(0, 40).map((ingredient) => ({
+          name: String(ingredient?.name || "Unknown").slice(0, 120),
+          nameArabic: ingredient?.nameArabic ? String(ingredient.nameArabic).slice(0, 120) : "",
+          estimatedGrams: Math.max(0, Math.round(finiteNumber(ingredient?.estimatedGrams))),
+          calories: Math.max(0, Math.round(finiteNumber(ingredient?.calories))),
+          protein: Math.max(0, finiteNumber(ingredient?.protein)),
+          carbs: Math.max(0, finiteNumber(ingredient?.carbs)),
+          fats: Math.max(0, finiteNumber(ingredient?.fats)),
+        }))
+      : [],
+    confidence: ["high", "medium", "low"].includes(result.confidence)
+      ? result.confidence
+      : "low",
+  };
+}
+
 async function callOpenRouter(apiKey, model, mimeType, base64) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+  const timeoutId = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
 
   try {
     const response = await fetch(
@@ -208,7 +349,14 @@ async function callOpenRouter(apiKey, model, mimeType, base64) {
         }),
       }
     );
-    return response;
+    const rawText = await response.text();
+    let data = null;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      // Keep the raw response for diagnostics without returning it to users.
+    }
+    return { response, data, rawText };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -217,9 +365,9 @@ async function callOpenRouter(apiKey, model, mimeType, base64) {
 export async function POST(req) {
   try {
     // ── 1. Database check ────────────────────────────────────────────────────
-    if (!isDatabaseConfigured) {
+    if (!isDatabaseConfigured || !db) {
       return NextResponse.json(
-        { error: "قاعدة البيانات غير مُعدة بعد." },
+        { error: "قاعدة البيانات غير متاحة حاليًا. حاول تاني بعد شوية." },
         { status: 503 }
       );
     }
@@ -237,15 +385,25 @@ export async function POST(req) {
     // ── 3. Server-side rate limit ────────────────────────────────────────────
     const windowStart = new Date(Date.now() - ANALYSIS_WINDOW_MS);
 
-    const [{ value: recentCount }] = await db
-      .select({ value: count() })
-      .from(meals)
-      .where(
-        and(
-          eq(meals.userId, userId),
-          gte(meals.createdAt, windowStart)
-        )
+    let recentCount;
+    try {
+      const [{ value }] = await db
+        .select({ value: count() })
+        .from(meals)
+        .where(
+          and(
+            eq(meals.userId, userId),
+            gte(meals.createdAt, windowStart)
+          )
+        );
+      recentCount = Number(value) || 0;
+    } catch (databaseError) {
+      console.error("[Luqmati] Analysis rate-limit query failed:", databaseError);
+      return NextResponse.json(
+        { error: "تخزين الوجبات غير متاح حاليًا. حاول تاني بعد شوية." },
+        { status: 503 }
       );
+    }
 
     if (recentCount >= ANALYSIS_LIMIT) {
       const oldest = await db
@@ -288,92 +446,142 @@ export async function POST(req) {
     }
 
     // ── 5. Validate image ────────────────────────────────────────────────────
-    if (!image.type.startsWith("image/")) {
-      return NextResponse.json(
-        { error: "الملف لازم يكون صورة." },
-        { status: 400 }
-      );
-    }
-
-    if (image.size > 10 * 1024 * 1024) {
+    if (image.size > MAX_IMAGE_BYTES) {
       return NextResponse.json(
         { error: "الصورة كبيرة جدًا. اختار صورة أقل من 10MB." },
         { status: 400 }
       );
     }
 
-    // ── 6. Convert image to Base64 ───────────────────────────────────────────
+    // ── 6. Validate the actual bytes, not only the browser-provided MIME type ──
     const bytes = await image.arrayBuffer();
-    const base64 = Buffer.from(bytes).toString("base64");
-    const mimeType = image.type || "image/jpeg";
+    const detectedMimeType = detectImageType(new Uint8Array(bytes));
 
-    // ── 7. Send to OpenRouter with automatic model fallback ──────────────────
+    if (!detectedMimeType) {
+      return NextResponse.json(
+        { error: "الملف ده مش صورة مدعومة. اختار JPG أو PNG أو WEBP." },
+        { status: 415 }
+      );
+    }
+
+    if (detectedMimeType === "image/heic") {
+      return NextResponse.json(
+        { error: "صيغة HEIC/HEIF محتاجة تحويل. افتح الصورة من جهازك أو حوّلها لـJPG وحاول تاني." },
+        { status: 415 }
+      );
+    }
+
+    if (!PROVIDER_IMAGE_TYPES.has(detectedMimeType)) {
+      return NextResponse.json(
+        { error: "صيغة الصورة دي مش مدعومة للتحليل. اختار JPG أو PNG أو WEBP." },
+        { status: 415 }
+      );
+    }
+
+    // ── 7. Convert image to Base64 ───────────────────────────────────────────
+    const base64 = Buffer.from(bytes).toString("base64");
+    const mimeType = detectedMimeType;
+
+    // ── 8. Send to OpenRouter with a narrowly-scoped model fallback ───────────
     const apiKey = process.env.OPENROUTER_API_KEY;
-    const primaryModel = process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash";
-    const fallbackModels = [primaryModel, "google/gemini-2.5-pro", "google/gemini-2.5-flash"];
+    if (!apiKey || !apiKey.startsWith("sk-or-")) {
+      console.error("[Luqmati] OPENROUTER_API_KEY is missing or malformed on the server.");
+      return NextResponse.json(
+        { error: "خدمة تحليل الأكل غير مُعدة حاليًا. حاول تاني بعد شوية." },
+        { status: 503 }
+      );
+    }
+
+    const primaryModel = process.env.OPENROUTER_MODEL?.trim() || FALLBACK_MODEL;
+    const fallbackModels = [primaryModel, FALLBACK_MODEL];
 
     // Deduplicate models to try
     const modelsToTry = [...new Set(fallbackModels)];
 
-    let response = null;
+    let responseData = null;
     let lastErrorData = null;
+    let lastStatus = 502;
+    let lastError = null;
 
     for (const modelCandidate of modelsToTry) {
       try {
-        const res = await callOpenRouter(apiKey, modelCandidate, mimeType, base64);
-        if (res.ok) {
-          response = res;
+        const result = await callOpenRouter(apiKey, modelCandidate, mimeType, base64);
+        lastStatus = result.response.status;
+        if (result.response.ok) {
+          responseData = result.data;
           break; // Success!
         } else {
-          lastErrorData = await res.json();
-          console.warn(`[Luqmati] Model ${modelCandidate} failed (${res.status}):`, lastErrorData?.error?.message);
+          lastErrorData = result.data;
+          console.warn(
+            `[Luqmati] Model ${modelCandidate} failed (${result.response.status}):`,
+            lastErrorData?.error?.message || result.rawText.slice(0, 300)
+          );
+
+          // Retry only stale/invalid model or modality settings. Retrying auth,
+          // quota, or provider failures with another model hides the root cause.
+          const providerMessage = String(lastErrorData?.error?.message || "").toLowerCase();
+          const shouldTryFallback =
+            (result.response.status === 400 || result.response.status === 404) &&
+            /model|vision|image|modal|input/.test(providerMessage);
+          if (!shouldTryFallback) break;
         }
       } catch (err) {
+        lastError = err;
         console.warn(`[Luqmati] Model ${modelCandidate} fetch error:`, err.message);
+        break;
       }
     }
 
-    if (!response) {
+    if (!responseData) {
       console.error("[Luqmati] All AI model candidates failed. Last error:", lastErrorData);
+      if (lastError?.name === "AbortError") {
+        return NextResponse.json(
+          { error: "التحليل أخد وقت أطول من اللازم. جرّب صورة أوضح وحاول تاني." },
+          { status: 504 }
+        );
+      }
+      if (lastStatus === 401 || lastStatus === 403) {
+        return NextResponse.json(
+          { error: "خدمة تحليل الأكل غير متاحة حاليًا. حاول تاني بعد شوية." },
+          { status: 503 }
+        );
+      }
+      if (lastStatus === 429) {
+        return NextResponse.json(
+          { error: "خدمة التحليل مشغولة حاليًا. حاول تاني بعد شوية." },
+          { status: 503 }
+        );
+      }
       return NextResponse.json(
         { error: "حصلت مشكلة مؤقتة في سيرفر الذكاء الاصطناعي. حاول تاني كمان شوية." },
+        { status: lastError ? 502 : 503 }
+      );
+    }
+
+    // ── 9. Parse OpenRouter response ─────────────────────────────────────────
+    const content = getAssistantText(responseData?.choices?.[0]?.message?.content);
+
+    if (!content) {
+      console.error("[Luqmati] Empty AI response:", JSON.stringify(responseData).slice(0, 1200));
+      return NextResponse.json(
+        { error: "الـAI مرجعش نتيجة. حاول تاني." },
         { status: 502 }
       );
     }
 
-    // ── 8. Parse OpenRouter response ─────────────────────────────────────────
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content;
-
-    if (!content) {
-      console.error("[Luqmati] Empty AI response:", JSON.stringify(data));
-      return NextResponse.json(
-        { error: "الـAI مرجعش نتيجة. حاول تاني." },
-        { status: 500 }
-      );
-    }
-
-    // ── 9. Extract and clean JSON ────────────────────────────────────────────
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const cleanedContent = jsonMatch
-      ? jsonMatch[0]
-      : content
-          .replace(/```json/gi, "")
-          .replace(/```/g, "")
-          .trim();
-
+    // ── 10. Extract and validate JSON ────────────────────────────────────────
     let result;
     try {
-      result = JSON.parse(cleanedContent);
+      result = normalizeResult(JSON.parse(extractJson(content)));
     } catch {
       console.error("[Luqmati] Invalid AI JSON:", content.slice(0, 500));
       return NextResponse.json(
         { error: "الـAI رجّع بيانات غير صالحة. حاول تاني." },
-        { status: 500 }
+        { status: 502 }
       );
     }
 
-    // ── 10. Save to DB ───────────────────────────────────────────────────────
+    // ── 11. Save to DB ───────────────────────────────────────────────────────
     const mealId = crypto.randomUUID();
 
     await db.insert(meals).values({
@@ -394,7 +602,7 @@ export async function POST(req) {
     });
 
     // ── 11. Return result with usage info ────────────────────────────────────
-    const newCount = recentCount + 1;
+    const newCount = Number(recentCount) + 1;
     const remaining = Math.max(0, ANALYSIS_LIMIT - newCount);
 
     const windowMeals = await db

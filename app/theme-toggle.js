@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 function getSystemTheme() {
   if (typeof window === "undefined") return "dark";
@@ -12,14 +12,21 @@ export function getInitialTheme() {
   return localStorage.getItem("luqmati-theme") || getSystemTheme();
 }
 
+function subscribeToTheme(callback) {
+  window.addEventListener("luqmati:theme", callback);
+  return () => window.removeEventListener("luqmati:theme", callback);
+}
+
+function getThemeSnapshot() {
+  return getInitialTheme();
+}
+
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState("dark");
+  const theme = useSyncExternalStore(subscribeToTheme, getThemeSnapshot, () => "dark");
 
   useEffect(() => {
-    const saved = localStorage.getItem("luqmati-theme");
-    const initial = saved || getSystemTheme();
+    const initial = getInitialTheme();
     applyTheme(initial, false);
-    setTheme(initial);
   }, []);
 
   function applyTheme(next, animate = true) {
@@ -29,15 +36,16 @@ export default function ThemeToggle() {
       setTimeout(() => root.classList.remove("theme-transitioning"), 450);
     }
     root.dataset.theme = next;
-    // Dispatch event so RibbonBackground can react
-    root.dispatchEvent(new CustomEvent("luqmati:theme", { detail: { theme: next } }));
+    const themeMeta = document.getElementById("theme-color-meta");
+    if (themeMeta) themeMeta.setAttribute("content", next === "dark" ? "#06040f" : "#f0f0fa");
+    // Keep the canvas/CSS background in sync with the explicit theme toggle.
+    window.dispatchEvent(new CustomEvent("luqmati:theme", { detail: { theme: next } }));
   }
 
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
-    applyTheme(next, true);
     localStorage.setItem("luqmati-theme", next);
-    setTheme(next);
+    applyTheme(next, true);
   }
 
   const isDark = theme === "dark";

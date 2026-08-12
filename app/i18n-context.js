@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
 
 // ── Translation strings ──────────────────────────────────────────────────────
 const strings = {
@@ -12,14 +12,14 @@ const strings = {
     // Nav
     home: "الرئيسية",
     history: "السجل",
-    profile: "الملف",
+    profile: "الملف الشخصي",
     addMeal: "إضافة",
     signIn: "دخول",
     signUp: "حساب جديد",
 
     // Home page
     heroTitle: "اعرف أكلك",
-    heroSubtitle: "صوّر طبقك واعرف تفاصيله بالذكاء الاصطناعي",
+    heroSubtitle: "صوّر طبقك واعرف تفاصيله بسهولة",
     uploadHint: "اسحب الصورة هنا أو اضغط للرفع",
     btnCamera: "صور اكلك",
     btnGallery: "اختر من المعرض",
@@ -28,6 +28,8 @@ const strings = {
     btnViewHistory: "عرض السجل",
     btnAnalyzeAnother: "تحليل طبق آخر",
     analyzing: "جاري تحليل طبقك...",
+    preparingImage: "جاري تجهيز الصورة...",
+    aiAnalyzing: "جاري التعرف على مكونات الطبق بالذكاء الاصطناعي...",
     signInToAnalyze: "لازم تسجل دخول عشان تحلل الطبق وتحفظه",
     btnSignIn: "تسجيل الدخول",
     savedConfirmation: "✅ تم تسجيل الوجبة في سجلك",
@@ -80,6 +82,8 @@ const strings = {
     imageTooLarge: "الصورة أكبر من 10MB. اختار صورة أصغر.",
     notAnImage: "الملف ده مش صورة. اختار صورة تاني.",
     analysisError: "حصلت مشكلة أثناء التحليل، جرّب تاني.",
+    analysisTimeout: "التحليل أخد وقت أطول من اللازم. جرّب تاني بصورة أوضح.",
+    imageConversionFailed: "الصيغة دي مش مدعومة على جهازك. حوّل الصورة لـJPG أو PNG وحاول تاني.",
     btnRetry: "حاول تاني",
 
     // Offline
@@ -117,6 +121,8 @@ const strings = {
     btnViewHistory: "View History",
     btnAnalyzeAnother: "Analyze Another",
     analyzing: "Analyzing your plate...",
+    preparingImage: "Preparing your image...",
+    aiAnalyzing: "AI is identifying the food and ingredients...",
     signInToAnalyze: "Sign in to analyze your plate and save your results",
     btnSignIn: "Sign In",
     savedConfirmation: "✅ Meal saved to your history",
@@ -169,6 +175,8 @@ const strings = {
     imageTooLarge: "Image is over 10MB. Please choose a smaller one.",
     notAnImage: "That file is not an image. Please choose an image.",
     analysisError: "Something went wrong during analysis. Please try again.",
+    analysisTimeout: "Analysis took too long. Please try again with a clearer image.",
+    imageConversionFailed: "This format is not supported on this device. Convert it to JPG or PNG and try again.",
     btnRetry: "Try Again",
 
     // Offline
@@ -191,24 +199,30 @@ const LangContext = createContext({
   toggleLang: () => {},
 });
 
+function subscribeToLanguage(callback) {
+  window.addEventListener("luqmati:lang", callback);
+  return () => window.removeEventListener("luqmati:lang", callback);
+}
+
+function getLanguageSnapshot() {
+  const saved = localStorage.getItem("luqmati-lang");
+  return saved === "en" ? "en" : "ar";
+}
+
 export function LangProvider({ children }) {
-  const [lang, setLang] = useState("ar");
+  const lang = useSyncExternalStore(subscribeToLanguage, getLanguageSnapshot, () => "ar");
 
   useEffect(() => {
-    const saved = localStorage.getItem("luqmati-lang");
-    if (saved === "ar" || saved === "en") {
-      setLang(saved);
-      document.documentElement.lang = saved;
-      document.documentElement.dir  = saved === "ar" ? "rtl" : "ltr";
-    }
-  }, []);
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  }, [lang]);
 
   function toggleLang() {
     const next = lang === "ar" ? "en" : "ar";
-    setLang(next);
     localStorage.setItem("luqmati-lang", next);
     document.documentElement.lang = next;
     document.documentElement.dir  = next === "ar" ? "rtl" : "ltr";
+    window.dispatchEvent(new Event("luqmati:lang"));
   }
 
   const value = {
