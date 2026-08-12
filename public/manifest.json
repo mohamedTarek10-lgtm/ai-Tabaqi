@@ -1,0 +1,17 @@
+{
+  "name": "لقمتي / Luqmati",
+  "short_name": "Luqmati",
+  "description": "تطبيق لقمتي لحساب السعرات والماكروز بالذكاء الاصطناعي — AI food & macro analyzer for Egyptian and global meals.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#06040f",
+  "theme_color": "#06040f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

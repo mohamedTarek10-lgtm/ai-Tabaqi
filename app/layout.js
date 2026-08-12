@@ -1,183 +1,145 @@
-import { ClerkProvider, SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs";
+import Script from "next/script";
 import "./globals.css";
-import Link from "next/link";
+import ClientProviders from "./client-providers";
+import { HeaderNav, FooterBranding } from "./header-nav";
 import MobileNavigation from "./mobile-navigation";
-import ThemeToggle from "./theme-toggle";
 
 export const metadata = {
-  title: "Tabaqi — اعرف أكلك فيه إيه",
-  description: "صوّر طبقك واعرف السعرات والماكروز تلقائياً بواسطة الذكاء الاصطناعي",
+  title: {
+    default: "لقمتي / Luqmati — تحليل السعرات والماكروز بالذكاء الاصطناعي",
+    template: "%s | لقمتي Luqmati",
+  },
+  description: "صوّر طبقك واعرف السعرات الحرارية والبروتين والماكروز فوراً بواسطة الذكاء الاصطناعي للأكلات المصرية والعربية — Snap your food and analyze macros instantly with AI.",
+  keywords: [
+    "Luqmati",
+    "لقمتي",
+    "تحليل الأكل",
+    "حساب السعرات",
+    "الماكروز",
+    "الذكاء الاصطناعي",
+    "أكل مصري",
+    "macro counter",
+    "food AI analyzer",
+    "Egyptian food calories",
+  ],
+  authors: [{ name: "MT" }],
+  creator: "MT",
+  publisher: "Luqmati",
+  metadataBase: new URL("https://luqmati.app"),
+  alternates: {
+    canonical: "/",
+    languages: {
+      "ar-EG": "/",
+      "en-US": "/?lang=en",
+    },
+  },
+  openGraph: {
+    title: "لقمتي / Luqmati — اعرف أكلك فيه إيه بالذكاء الاصطناعي",
+    description: "تطبيق لقمتي لتحليل الأكل والسعرات والبروتين بدقة فائقة للأكلات المصرية والعالمية",
+    url: "https://luqmati.app",
+    siteName: "Luqmati لقمتي",
+    locale: "ar_EG",
+    type: "website",
+    images: [
+      {
+        url: "/icon-512.png",
+        width: 512,
+        height: 512,
+        alt: "لقمتي Luqmati AI Food Analyzer",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "لقمتي / Luqmati — AI Food & Macro Analyzer",
+    description: "صوّر طبقك واعرف السعرات والبروتين والماكروز تلقائياً",
+    creator: "@LuqmatiApp",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+    },
+  },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "لقمتي Luqmati",
+  },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({ children }) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "لقمتي / Luqmati",
+    alternateName: "Luqmati",
+    url: "https://luqmati.app",
+    applicationCategory: "HealthApplication",
+    operatingSystem: "All",
+    description: "AI powered food and macro nutrition analyzer tailored for Egyptian and international meals.",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "EGP",
+    },
+  };
+
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html lang="ar" dir="rtl" suppressHydrationWarning style={{ scrollBehavior: "smooth" }}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#7c3aed" />
+        <meta name="theme-color" content="#06040f" />
+        <Script
+          id="json-ld"
+          type="application/ld+json"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body>
         <ClerkProvider>
-          {/* Animated background blobs */}
-          <div className="tabaqi-bg" aria-hidden="true">
-            <div className="tabaqi-blob tabaqi-blob-1" />
-            <div className="tabaqi-blob tabaqi-blob-2" />
-            <div className="tabaqi-blob tabaqi-blob-3" />
-          </div>
+          <ClientProviders>
+            <HeaderNav />
 
-          <header className="mobile-header mobile-only">
-            <div className="mobile-brand" aria-label="Tabaqi طبقي">
-              <span>طبقي</span>
-              <span className="font-english">Tabaqi</span>
-            </div>
-            <ThemeToggle />
-          </header>
-
-          {/* Desktop Top Navbar — hidden on mobile */}
-          <header
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              zIndex: 40,
-              display: "none",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "0 40px",
-              height: "64px",
-              background: "var(--nav-bg)",
-              backdropFilter: "blur(16px)",
-              WebkitBackdropFilter: "blur(16px)",
-              borderBottom: "1px solid var(--nav-border)",
-            }}
-            className="desktop-nav"
-          >
-            {/* Right: Brand */}
-            <div
-              className="font-english"
-              style={{
-                fontSize: "26px",
-                fontWeight: 600,
-                color: "var(--brand)",
-                letterSpacing: "-0.5px",
-                userSelect: "none",
-              }}
-            >
-              Tabaqi
+            {/* Main Wrapper */}
+            <div className="page-wrapper" style={{ position: "relative", zIndex: 1, minHeight: "100dvh" }}>
+              {children}
             </div>
 
-            {/* Center: Navigation links */}
-            <nav style={{ display: "flex", gap: "32px", alignItems: "center" }}>
-              <Link href="/" style={navLinkStyle}>الرئيسية</Link>
-              <Link href="/history" style={navLinkStyle}>السجل</Link>
-              <Link href="/profile" style={navLinkStyle}>الملف</Link>
-            </nav>
+            <FooterBranding />
 
-            {/* Left: Auth */}
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <ThemeToggle />
-              <Show when="signed-out">
-                <SignInButton mode="modal">
-                  <button
-                    style={{
-                      padding: "7px 16px",
-                      borderRadius: "10px",
-                      border: "1.5px solid var(--glass-border)",
-                      background: "transparent",
-                      color: "var(--text-primary)",
-                      fontSize: "13px",
-                      cursor: "pointer",
-                      fontWeight: 500,
-                    }}
-                  >
-                    دخول
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="btn-primary" style={{ padding: "7px 16px", fontSize: "13px" }}>
-                    حساب جديد
-                  </button>
-                </SignUpButton>
-              </Show>
-              <Show when="signed-in">
-                <UserButton />
-              </Show>
-            </div>
-          </header>
-
-          {/* Page Content */}
-          <div
-            style={{
-              position: "relative",
-              zIndex: 1,
-              minHeight: "100dvh",
-              paddingBottom: "80px", /* space for bottom nav on mobile */
-            }}
-            className="page-wrapper"
-          >
-            {children}
-          </div>
-
-          {/* Mobile Bottom Navigation */}
-          <MobileNavigation />
-          <nav className="bottom-nav mobile-only" aria-label="التنقل الرئيسي">
-            <Link href="/" className="bottom-nav-item" id="nav-home">
-              <span className="nav-icon-wrap">
-                <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 9.75L12 3l9 6.75V21a.75.75 0 01-.75.75H15.75a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H3.75A.75.75 0 013 21V9.75z" />
-                </svg>
-              </span>
-              <span>الرئيسية</span>
-            </Link>
-
-            <Link href="/history" className="bottom-nav-item" id="nav-history">
-              <span className="nav-icon-wrap">
-                <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </span>
-              <span>السجل</span>
-            </Link>
-
-            <Link href="/" className="bottom-nav-item nav-add" id="nav-add">
-              <span className="nav-icon-wrap">
-                <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-              </span>
-              <span>إضافة</span>
-            </Link>
-
-            <Link href="/profile" className="bottom-nav-item" id="nav-profile">
-              <span className="nav-icon-wrap">
-                <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                </svg>
-              </span>
-              <span>ملفك الشخصي</span>
-            </Link>
-          </nav>
-
-          {/* Responsive: show desktop nav on large screens */}
-          <style>{`
-            @media (min-width: 768px) {
-              .desktop-nav { display: flex !important; }
-              .mobile-only { display: none !important; }
-              .page-wrapper { padding-top: 64px; padding-bottom: 0; }
-            }
-            .bottom-nav:has(#nav-home) { display: none !important; }
-          `}</style>
+            {/* Mobile Bottom Navigation */}
+            <MobileNavigation />
+          </ClientProviders>
         </ClerkProvider>
+
+        {/* Register Service Worker for PWA & Offline Support using Next.js Script */}
+        <Script
+          id="register-sw"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                    console.log('SW registration failed: ', err);
+                  });
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
 }
-
-const navLinkStyle = {
-  fontSize: "14px",
-  fontWeight: 500,
-  color: "var(--text-secondary)",
-  textDecoration: "none",
-  transition: "color 0.2s",
-};

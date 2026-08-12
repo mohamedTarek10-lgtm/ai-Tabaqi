@@ -1,35 +1,48 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { useLang } from "./i18n-context";
+import ProteinRing from "./protein-ring";
+import InstallPrompt from "./install-prompt";
 
-// ─── Confidence display helpers ───────────────────────────────────────────────
-function confidenceLabel(c) {
+function confidenceLabel(c, t) {
   if (c === "high")
-    return { label: "دقة عالية", cls: "confidence-high", pct: "95%" };
+    return { label: t.confidenceHigh, cls: "confidence-high", pct: "95%" };
   if (c === "medium")
-    return { label: "دقة متوسطة", cls: "confidence-medium", pct: "75%" };
-  return { label: "دقة منخفضة", cls: "confidence-low", pct: "50%" };
+    return { label: t.confidenceMedium, cls: "confidence-medium", pct: "75%" };
+  return { label: t.confidenceLow, cls: "confidence-low", pct: "50%" };
 }
 
-// ─── Macro Card ───────────────────────────────────────────────────────────────
 function MacroCard({ emoji, label, value, unit, colorClass, delay }) {
   return (
-    <div className={`macro-card ${colorClass} fade-in fade-in-delay-${delay}`}>
-      <div style={{ fontSize: "22px", marginBottom: "6px" }}>{emoji}</div>
+    <div
+      className={`macro-card ${colorClass} fade-in fade-in-delay-${delay}`}
+      style={{ padding: "14px 12px", textAlign: "center" }}
+    >
+      <div style={{ fontSize: "20px", marginBottom: "4px" }}>{emoji}</div>
       <div
         style={{
           fontSize: "11px",
           fontWeight: 500,
-          opacity: 0.7,
-          marginBottom: "4px",
+          opacity: 0.8,
+          marginBottom: "2px",
         }}
       >
         {label}
       </div>
-      <div style={{ fontSize: "26px", fontWeight: 700, lineHeight: 1 }}>
+      <div
+        className="font-english"
+        style={{ fontSize: "22px", fontWeight: 700, lineHeight: 1.1 }}
+      >
         {value ?? "—"}
-        <span style={{ fontSize: "13px", fontWeight: 400, marginRight: "2px" }}>
+        <span
+          style={{
+            fontSize: "12px",
+            fontWeight: 400,
+            marginInlineStart: "2px",
+          }}
+        >
           {unit}
         </span>
       </div>
@@ -37,29 +50,70 @@ function MacroCard({ emoji, label, value, unit, colorClass, delay }) {
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Home() {
   const { isSignedIn, isLoaded } = useAuth();
+  const { t, lang } = useLang();
 
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [analyzingStep, setAnalyzingStep] = useState("");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [rateLimitInfo, setRateLimitInfo] = useState(null);
+  const [usage, setUsage] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+
+  // Manual ingredient edit state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editableIngredients, setEditableIngredients] = useState([]);
+  const [newIngName, setNewIngName] = useState("");
+  const [newIngGrams, setNewIngGrams] = useState("");
+  const [newIngProtein, setNewIngProtein] = useState("");
+  const [newIngCalories, setNewIngCalories] = useState("");
 
   const fileInput = useRef(null);
   const cameraInput = useRef(null);
 
-  // ── File handling ──────────────────────────────────────────────────────────
+  // ── Online / Offline listener ──────────────────────────────────────────────
+  useEffect(() => {
+    setIsOffline(!navigator.onLine);
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // ── Usage counter fetch ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isSignedIn) return;
+    fetch("/api/usage")
+      .then((r) => r.json())
+      .then((d) => setUsage(d))
+      .catch(() => {});
+  }, [isSignedIn, saved]);
+
+  // ── Sync editable ingredients when result arrives ───────────────────────
+  useEffect(() => {
+    if (result?.ingredients) {
+      setEditableIngredients([...result.ingredients]);
+    }
+  }, [result]);
+
+  // ── File validation & handle ─────────────────────────────────────────────
   function handleFile(f) {
     if (!f || !f.type.startsWith("image/")) {
-      setError("الملف ده مش صورة. اختار صورة تاني.");
+      setError(t.notAnImage);
       return;
     }
     if (f.size > 10 * 1024 * 1024) {
-      setError("الصورة أكبر من 10MB. اختار صورة أصغر.");
+      setError(t.imageTooLarge);
       return;
     }
     setFile(f);
@@ -67,6 +121,8 @@ export default function Home() {
     setResult(null);
     setError("");
     setSaved(false);
+    setRateLimitInfo(null);
+    setIsEditing(false);
   }
 
   const onFileInput = (e) => handleFile(e.target.files?.[0]);
@@ -81,14 +137,18 @@ export default function Home() {
   };
   const onDragLeave = () => setDragOver(false);
 
-  // ── Analyze ────────────────────────────────────────────────────────────────
+  // ── Analyze food ─────────────────────────────────────────────────────────
   async function analyzeFood() {
+    if (isOffline) {
+      setError(t.offlineAnalysisMsg);
+      return;
+    }
     if (!file) {
-      setError("اختار صورة أكل الأول.");
+      setError(t.noImage);
       return;
     }
     if (!isSignedIn) {
-      setError("لازم تسجل دخول الأول عشان تحلل الطبق.");
+      setError(t.notSignedIn);
       return;
     }
 
@@ -97,6 +157,11 @@ export default function Home() {
       setError("");
       setResult(null);
       setSaved(false);
+      setRateLimitInfo(null);
+
+      setAnalyzingStep("جاري تجهيز الصورة...");
+      await new Promise((r) => setTimeout(r, 300));
+      setAnalyzingStep("جاري التعرف على مكونات الطبق بالذكاء الاصطناعي...");
 
       const form = new FormData();
       form.append("image", file);
@@ -105,16 +170,29 @@ export default function Home() {
         method: "POST",
         body: form,
       });
+
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "حصلت مشكلة أثناء التحليل.");
+      if (res.status === 429) {
+        setRateLimitInfo({
+          resetAt: data.resetAt,
+          limit: data.limit,
+        });
+        throw new Error(data.error || "وصلت للحد المسموح من التحليلات.");
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || t.analysisError);
+      }
 
       setResult(data.result);
-      setSaved(true); // API already saves it
+      if (data.usage) setUsage(data.usage);
+      setSaved(true);
     } catch (err) {
-      setError(err.message || "حصلت مشكلة أثناء التحليل، جرّب تاني.");
+      setError(err.message || t.analysisError);
     } finally {
       setLoading(false);
+      setAnalyzingStep("");
     }
   }
 
@@ -124,24 +202,98 @@ export default function Home() {
     setResult(null);
     setError("");
     setSaved(false);
+    setRateLimitInfo(null);
+    setIsEditing(false);
     if (fileInput.current) fileInput.current.value = "";
     if (cameraInput.current) cameraInput.current.value = "";
   }
 
-  const conf = result ? confidenceLabel(result.confidence) : null;
+  // ── Manual Ingredient Correction Handlers ────────────────────────────────
+  function handleRemoveIngredient(index) {
+    const updated = editableIngredients.filter((_, i) => i !== index);
+    updateResultIngredients(updated);
+  }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  function handleAddIngredient(e) {
+    e.preventDefault();
+    if (!newIngName.trim()) return;
+    const newIng = {
+      name: newIngName,
+      nameArabic: newIngName,
+      estimatedGrams: Number(newIngGrams) || 0,
+      protein: Number(newIngProtein) || 0,
+      calories: Number(newIngCalories) || 0,
+      carbs: 0,
+      fats: 0,
+    };
+    const updated = [...editableIngredients, newIng];
+    updateResultIngredients(updated);
+    setNewIngName("");
+    setNewIngGrams("");
+    setNewIngProtein("");
+    setNewIngCalories("");
+  }
+
+  function updateResultIngredients(updated) {
+    setEditableIngredients(updated);
+    const newProtein = updated.reduce(
+      (acc, curr) => acc + (Number(curr.protein) || 0),
+      0,
+    );
+    const newCalories = updated.reduce(
+      (acc, curr) => acc + (Number(curr.calories) || 0),
+      0,
+    );
+    setResult((prev) => ({
+      ...prev,
+      ingredients: updated,
+      protein: newProtein > 0 ? newProtein : prev.protein,
+      calories: newCalories > 0 ? newCalories : prev.calories,
+    }));
+  }
+
+  const conf = result ? confidenceLabel(result.confidence, t) : null;
+
   return (
     <div
       style={{
-        minHeight: "100dvh",
+        minHeight: "calc(100dvh - 80px)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "24px 16px 16px",
+        padding: "24px 16px 32px",
       }}
     >
+      {/* PWA Install Banner */}
+      <InstallPrompt />
+
+      {/* Offline banner alert */}
+      {isOffline && (
+        <div
+          className="fade-in"
+          style={{
+            width: "100%",
+            maxWidth: "520px",
+            padding: "12px 16px",
+            borderRadius: "14px",
+            background: "rgba(239, 68, 68, 0.12)",
+            border: "1px solid rgba(239, 68, 68, 0.25)",
+            color: "#ef4444",
+            fontSize: "13px",
+            marginBottom: "16px",
+            textAlign: "center",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+          }}
+        >
+          <span>📶</span>
+          <span>{t.offlineAnalysisMsg}</span>
+        </div>
+      )}
+
       {/* ── Upload Card ─────────────────────────────────────────────────── */}
       {!result && (
         <div
@@ -149,74 +301,108 @@ export default function Home() {
           style={{
             width: "100%",
             maxWidth: "520px",
-            padding: "40px 32px 36px",
+            padding: "36px 28px 32px",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             textAlign: "center",
           }}
         >
-          {/* Title */}
+          {/* Header & Usage Counter */}
+          <div
+            style={{
+              display: "flex",
+              width: "100%",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "16px",
+            }}
+          >
+            <span
+              className="font-arabic"
+              style={{
+                fontSize: "28px",
+                fontWeight: 700,
+                color: "var(--brand)",
+              }}
+            >
+              لقمتي
+            </span>
+
+            {usage && (
+              <div className="usage-counter">
+                <span
+                  className="usage-dot"
+                  style={{
+                    background: usage.remaining > 0 ? "#22c55e" : "#ef4444",
+                  }}
+                />
+                <span>
+                  {usage.remaining} / {usage.limit} {t.analysesLeft}
+                </span>
+              </div>
+            )}
+          </div>
+
           <h1
             className="font-arabic"
             style={{
-              fontSize: "clamp(28px, 7vw, 42px)",
+              fontSize: "clamp(26px, 6vw, 38px)",
               fontWeight: 700,
               color: "var(--text-primary)",
-              marginBottom: "10px",
+              marginBottom: "8px",
               lineHeight: 1.25,
             }}
           >
-       اعرف اكلك
+            {t.heroTitle}
           </h1>
 
           <p
             style={{
-              fontSize: "15px",
+              fontSize: "14px",
               color: "var(--text-secondary)",
-              marginBottom: "32px",
+              marginBottom: "28px",
             }}
           >
-  صوّر طبقك واعرف تفاصيله
+            {t.heroSubtitle}
           </p>
 
-          {/* Drop Zone / Preview */}
+          {/* Upload Zone / Image Preview */}
           {!preview ? (
             <div
               className={`upload-zone ${dragOver ? "drag-active" : ""}`}
               style={{
                 width: "100%",
-                minHeight: "200px",
+                minHeight: "210px",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                padding: "40px 24px",
-                marginBottom: "28px",
-                gap: "12px",
+                padding: "36px 20px",
+                marginBottom: "24px",
+                gap: "14px",
               }}
               onClick={() => fileInput.current?.click()}
               onDrop={onDrop}
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
             >
-              {/* Camera icon */}
               <div
                 style={{
-                  width: "68px",
-                  height: "68px",
+                  width: "64px",
+                  height: "64px",
                   borderRadius: "50%",
-                  background: "var(--brand)",
+                  background:
+                    "linear-gradient(135deg, var(--brand), var(--brand-strong))",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 6px 20px rgba(124,58,237,0.4)",
-                  transition: "transform 0.2s ease",
+                  boxShadow: "0 8px 24px rgb(108 63 212 / 0.35)",
                 }}
               >
                 <svg
-                  width="30"
-                  height="30"
+                  width="28"
+                  height="28"
                   fill="none"
                   stroke="white"
                   strokeWidth="2"
@@ -230,12 +416,18 @@ export default function Home() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"
+                    d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
                   />
                 </svg>
               </div>
-              <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-                اسحب الصورة هنا أو اضغط للرفع
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "var(--text-muted)",
+                  fontWeight: 500,
+                }}
+              >
+                {t.uploadHint}
               </p>
             </div>
           ) : (
@@ -248,28 +440,29 @@ export default function Home() {
             >
               <img
                 src={preview}
-                alt="preview"
+                alt="food preview"
                 style={{
                   width: "100%",
                   maxHeight: "260px",
                   objectFit: "cover",
-                  borderRadius: "16px",
+                  borderRadius: "18px",
                   border: "1px solid var(--glass-border)",
                 }}
               />
               <button
                 onClick={reset}
-                title="تغيير الصورة"
+                title={t.btnChangeImage}
                 style={{
                   position: "absolute",
                   top: "10px",
-                  left: "10px",
-                  background: "rgba(0,0,0,0.55)",
+                  left: lang === "ar" ? "auto" : "10px",
+                  right: lang === "ar" ? "10px" : "auto",
+                  background: "rgba(0,0,0,0.6)",
                   color: "white",
                   border: "none",
                   borderRadius: "50%",
-                  width: "34px",
-                  height: "34px",
+                  width: "36px",
+                  height: "36px",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -278,8 +471,8 @@ export default function Home() {
                 }}
               >
                 <svg
-                  width="16"
-                  height="16"
+                  width="18"
+                  height="18"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -288,14 +481,14 @@ export default function Home() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+                    d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
               </button>
             </div>
           )}
 
-          {/* Hidden inputs */}
+          {/* Hidden File & Camera Inputs */}
           <input
             ref={fileInput}
             type="file"
@@ -312,22 +505,38 @@ export default function Home() {
             style={{ display: "none" }}
           />
 
-          {/* Error message */}
+          {/* Error & Rate Limit Alerts */}
           {error && (
             <div
               style={{
                 width: "100%",
                 padding: "12px 16px",
                 borderRadius: "12px",
-                background: "rgba(239,68,68,0.08)",
-                border: "1px solid rgba(239,68,68,0.2)",
+                background: "rgba(239,68,68,0.09)",
+                border: "1px solid rgba(239,68,68,0.22)",
                 color: "#dc2626",
                 fontSize: "13px",
                 marginBottom: "16px",
                 textAlign: "center",
               }}
             >
-              {error}
+              <p>{error}</p>
+              {rateLimitInfo?.resetAt && (
+                <p
+                  style={{
+                    marginTop: "6px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    opacity: 0.9,
+                  }}
+                >
+                  ⏳ {t.resetIn}{" "}
+                  {new Date(rateLimitInfo.resetAt).toLocaleTimeString(
+                    lang === "ar" ? "ar-EG" : "en-US",
+                    { hour: "2-digit", minute: "2-digit" },
+                  )}
+                </p>
+              )}
             </div>
           )}
 
@@ -365,7 +574,7 @@ export default function Home() {
                     d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
                   />
                 </svg>
-                صور اكلك
+                {t.btnCamera}
               </button>
 
               <button
@@ -387,7 +596,7 @@ export default function Home() {
                     d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
                   />
                 </svg>
-                اختر من المعرض
+                {t.btnGallery}
               </button>
             </div>
           ) : (
@@ -399,7 +608,6 @@ export default function Home() {
                 gap: "10px",
               }}
             >
-              {/* Loading state */}
               {loading && (
                 <div
                   style={{
@@ -413,9 +621,13 @@ export default function Home() {
                 >
                   <div className="spinner" />
                   <p
-                    style={{ color: "var(--text-secondary)", fontSize: "14px" }}
+                    style={{
+                      color: "var(--text-secondary)",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                    }}
                   >
-                    جاري تحليل طبقك...
+                    {analyzingStep || t.analyzing}
                   </p>
                 </div>
               )}
@@ -428,30 +640,27 @@ export default function Home() {
                         textAlign: "center",
                         color: "var(--text-secondary)",
                         fontSize: "13px",
+                        padding: "10px 0",
                       }}
                     >
-                      <p style={{ marginBottom: "10px" }}>
-                        لازم تسجل دخول عشان تحلل الطبق وتحفظه
+                      <p style={{ marginBottom: "12px" }}>
+                        {t.signInToAnalyze}
                       </p>
-                      <div
+                      <button
+                        className="btn-primary"
                         style={{
-                          display: "flex",
-                          gap: "10px",
-                          justifyContent: "center",
+                          padding: "12px 24px",
+                          fontSize: "14px",
+                          width: "100%",
                         }}
+                        onClick={() =>
+                          document.dispatchEvent(
+                            new Event("clerk:open-sign-in"),
+                          )
+                        }
                       >
-                        <button
-                          className="btn-primary"
-                          style={{ padding: "10px 20px", fontSize: "14px" }}
-                          onClick={() =>
-                            document.dispatchEvent(
-                              new Event("clerk:open-sign-in"),
-                            )
-                          }
-                        >
-                          تسجيل الدخول
-                        </button>
-                      </div>
+                        {t.btnSignIn}
+                      </button>
                     </div>
                   ) : (
                     <button
@@ -462,7 +671,7 @@ export default function Home() {
                         fontSize: "16px",
                       }}
                       onClick={analyzeFood}
-                      disabled={loading}
+                      disabled={loading || usage?.remaining === 0}
                     >
                       <svg
                         width="18"
@@ -478,7 +687,7 @@ export default function Home() {
                           d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
                         />
                       </svg>
-                      حلّل الطبق
+                      {t.btnAnalyze}
                     </button>
                   )}
 
@@ -487,7 +696,7 @@ export default function Home() {
                     style={{ width: "100%", height: "44px", fontSize: "14px" }}
                     onClick={reset}
                   >
-                    تغيير الصورة
+                    {t.btnChangeImage}
                   </button>
                 </>
               )}
@@ -496,7 +705,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── Result Card ─────────────────────────────────────────────────── */}
+      {/* ── Nutrition Results Dashboard ────────────────────────────────────── */}
       {result && (
         <div
           className="glass-card fade-in"
@@ -507,7 +716,7 @@ export default function Home() {
             overflow: "hidden",
           }}
         >
-          {/* Food image + confidence badge */}
+          {/* Header image & badges */}
           {preview && (
             <div style={{ position: "relative" }}>
               <img
@@ -515,7 +724,7 @@ export default function Home() {
                 alt={result.foodNameArabic || result.foodName}
                 style={{
                   width: "100%",
-                  height: "220px",
+                  height: "230px",
                   objectFit: "cover",
                   display: "block",
                 }}
@@ -530,20 +739,19 @@ export default function Home() {
                   alignItems: "center",
                 }}
               >
-                {/* Tabaqi badge */}
                 <span
                   className="font-english"
                   style={{
-                    background: "rgba(124,58,237,0.85)",
+                    background: "rgba(108,63,212,0.85)",
                     color: "white",
                     fontSize: "11px",
-                    fontWeight: 600,
+                    fontWeight: 700,
                     padding: "4px 10px",
                     borderRadius: "20px",
                     backdropFilter: "blur(8px)",
                   }}
                 >
-                  Tabaqi AI
+                  Luqmati AI
                 </span>
 
                 {conf && (
@@ -559,17 +767,19 @@ export default function Home() {
           )}
 
           <div style={{ padding: "24px 24px 0" }}>
-            {/* Food name */}
+            {/* Dish title */}
             <h2
               className="font-arabic fade-in"
               style={{
-                fontSize: "22px",
+                fontSize: "24px",
                 fontWeight: 700,
                 color: "var(--text-primary)",
-                marginBottom: "8px",
+                marginBottom: "6px",
               }}
             >
-              {result.foodNameArabic || result.foodName || "طبق غير معروف"}
+              {lang === "ar"
+                ? result.foodNameArabic || result.foodName
+                : result.foodName || result.foodNameArabic}
             </h2>
 
             {/* Description */}
@@ -593,29 +803,64 @@ export default function Home() {
                 className="fade-in"
                 style={{
                   padding: "10px 14px",
-                  borderRadius: "10px",
-                  background: "rgba(245,158,11,0.08)",
-                  border: "1px solid rgba(245,158,11,0.2)",
+                  borderRadius: "12px",
+                  background: "rgba(245,158,11,0.09)",
+                  border: "1px solid rgba(245,158,11,0.22)",
                   color: "#b45309",
                   fontSize: "12px",
-                  marginBottom: "16px",
+                  marginBottom: "18px",
                 }}
               >
-                ⚠️ القيم دي تقديرية وممكن تكون مش دقيقة جداً بسبب جودة الصورة أو
-                التنوع في طريقة التحضير.
+                {t.lowConfidenceNote}
               </div>
             )}
 
-            {/* Calories — large featured card */}
+            {/* Featured Ring Visualization for Protein */}
+            <div
+              className="glass-card fade-in"
+              style={{
+                padding: "24px 16px",
+                marginBottom: "20px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                background:
+                  "linear-gradient(135deg, rgb(167 139 250 / 0.12), rgb(236 72 153 / 0.08))",
+                borderColor: "rgb(167 139 250 / 0.25)",
+              }}
+            >
+              <ProteinRing
+                proteinGrams={result.protein || 0}
+                targetGrams={50}
+              />
+
+              {result.proteinNote && (
+                <div
+                  style={{
+                    marginTop: "14px",
+                    padding: "8px 12px",
+                    borderRadius: "10px",
+                    background: "rgba(124,58,237,0.08)",
+                    border: "1px solid rgba(124,58,237,0.18)",
+                    color: "var(--brand)",
+                    fontSize: "12px",
+                    textAlign: "center",
+                  }}
+                >
+                  💡 {result.proteinNote}
+                </div>
+              )}
+            </div>
+
+            {/* Calories & Macro Breakdown */}
             <div
               className="macro-card macro-card-calories fade-in"
               style={{
                 marginBottom: "12px",
-                padding: "18px 20px",
+                padding: "16px 20px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                textAlign: "right",
               }}
             >
               <div>
@@ -623,37 +868,35 @@ export default function Home() {
                   style={{
                     fontSize: "12px",
                     fontWeight: 500,
-                    opacity: 0.7,
-                    marginBottom: "4px",
+                    opacity: 0.8,
+                    marginBottom: "2px",
                   }}
                 >
-                  السعرات الحرارية
+                  {t.calories}
                 </div>
                 <div
                   className="font-english"
                   style={{
-                    fontSize: "38px",
-                    fontWeight: 700,
-                    lineHeight: 1,
+                    fontSize: "36px",
+                    fontWeight: 800,
                     color: "var(--color-calories)",
                   }}
                 >
                   {result.calories ?? "—"}
                   <span
                     style={{
-                      fontSize: "16px",
-                      fontWeight: 400,
-                      marginRight: "4px",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                      marginInlineStart: "4px",
                     }}
                   >
-                    kcal
+                    {t.kcal}
                   </span>
                 </div>
               </div>
-              <div style={{ fontSize: "36px" }}>🔥</div>
+              <div style={{ fontSize: "34px" }}>🔥</div>
             </div>
 
-            {/* Macro grid */}
             <div
               style={{
                 display: "grid",
@@ -664,25 +907,25 @@ export default function Home() {
             >
               <MacroCard
                 emoji="💪"
-                label="بروتين"
+                label={t.protein}
                 value={result.protein}
-                unit="g"
+                unit={t.grams}
                 colorClass="macro-card-protein"
                 delay={1}
               />
               <MacroCard
                 emoji="🍚"
-                label="كربوهيدرات"
+                label={t.carbs}
                 value={result.carbs}
-                unit="g"
+                unit={t.grams}
                 colorClass="macro-card-carbs"
                 delay={2}
               />
               <MacroCard
                 emoji="🥑"
-                label="دهون"
+                label={t.fats}
                 value={result.fats}
-                unit="g"
+                unit={t.grams}
                 colorClass="macro-card-fats"
                 delay={3}
               />
@@ -703,84 +946,258 @@ export default function Home() {
                   color: "var(--text-secondary)",
                 }}
               >
-                <span>📏 الحجم: {result.portion.size}</span>
+                <span>
+                  📏 {t.portionSize}: {result.portion.size}
+                </span>
                 {result.portion.estimatedGrams && (
-                  <span>⚖️ تقريباً {result.portion.estimatedGrams}g</span>
+                  <span>
+                    ⚖️ {t.weight}: {result.portion.estimatedGrams}g
+                  </span>
                 )}
               </div>
             )}
 
-            {/* Ingredients */}
-            {result.ingredients?.length > 0 && (
+            {/* Ingredients & Manual Correction UI */}
+            <div
+              className="fade-in fade-in-delay-4"
+              style={{ marginBottom: "24px" }}
+            >
               <div
-                className="fade-in fade-in-delay-4"
-                style={{ marginBottom: "20px" }}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "12px",
+                }}
               >
                 <h3
                   style={{
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "var(--text-secondary)",
-                    marginBottom: "10px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    color: "var(--text-primary)",
                   }}
                 >
-                  المكونات
+                  {t.ingredients} ({editableIngredients.length})
                 </h3>
-                <div
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => setIsEditing(!isEditing)}
                   style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "6px",
+                    padding: "4px 10px",
+                    fontSize: "12px",
+                    height: "auto",
                   }}
                 >
-                  {result.ingredients.map((ing, i) => (
+                  {isEditing ? "إغلاق التعديل" : "تعديل المكونات ✏️"}
+                </button>
+              </div>
+
+              {/* Ingredients List */}
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+              >
+                {editableIngredients.map((ing, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "10px 14px",
+                      borderRadius: "12px",
+                      background: "var(--bg-subtle)",
+                      fontSize: "13px",
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontWeight: 600 }}>
+                        {lang === "ar"
+                          ? ing.nameArabic || ing.name
+                          : ing.name || ing.nameArabic}
+                      </span>
+                      {(ing.protein > 0 || ing.calories > 0) && (
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--text-muted)",
+                            marginInlineStart: "8px",
+                          }}
+                        >
+                          (💪 {ing.protein || 0}g · 🔥 {ing.calories || 0}kcal)
+                        </span>
+                      )}
+                    </div>
+
                     <div
-                      key={i}
                       style={{
                         display: "flex",
-                        justifyContent: "space-between",
                         alignItems: "center",
-                        padding: "8px 12px",
-                        borderRadius: "10px",
-                        background: "var(--bg-subtle)",
-                        fontSize: "12px",
-                        color: "var(--text-primary)",
+                        gap: "10px",
                       }}
                     >
-                      <span
-                        style={{ color: "var(--text-secondary)" }}
-                        className="font-english"
-                      >
-                        {ing.estimatedGrams ? `${ing.estimatedGrams}g` : ""} ·{" "}
-                        {ing.calories ? `${ing.calories} kcal` : ""}
-                      </span>
-                      <span style={{ fontWeight: 500 }}>
-                        {ing.nameArabic || ing.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                      {ing.estimatedGrams && (
+                        <span
+                          className="font-english"
+                          style={{
+                            fontSize: "12px",
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          {ing.estimatedGrams}g
+                        </span>
+                      )}
 
-            {/* Saved confirmation */}
+                      {isEditing && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveIngredient(i)}
+                          style={{
+                            background: "rgba(239, 68, 68, 0.15)",
+                            color: "#ef4444",
+                            border: "none",
+                            borderRadius: "6px",
+                            padding: "2px 8px",
+                            cursor: "pointer",
+                            fontSize: "11px",
+                          }}
+                        >
+                          حذف ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add New Ingredient Form (Manual Correction) */}
+              {isEditing && (
+                <form
+                  onSubmit={handleAddIngredient}
+                  style={{
+                    marginTop: "12px",
+                    padding: "14px",
+                    borderRadius: "14px",
+                    border: "1px dashed var(--brand-soft)",
+                    background: "rgba(124,58,237,0.04)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: "var(--brand)",
+                    }}
+                  >
+                    إضافة مكون جديد يدويًا
+                  </span>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "2fr 1fr",
+                      gap: "8px",
+                    }}
+                  >
+                    <input
+                      type="text"
+                      placeholder="اسم المكون (مثال: فراخ)"
+                      value={newIngName}
+                      onChange={(e) => setNewIngName(e.target.value)}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--glass-border)",
+                        background: "var(--glass)",
+                        color: "var(--text-primary)",
+                        fontSize: "12px",
+                      }}
+                    />
+                    <input
+                      type="number"
+                      placeholder="الوزن جرام"
+                      value={newIngGrams}
+                      onChange={(e) => setNewIngGrams(e.target.value)}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--glass-border)",
+                        background: "var(--glass)",
+                        color: "var(--text-primary)",
+                        fontSize: "12px",
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "8px",
+                    }}
+                  >
+                    <input
+                      type="number"
+                      placeholder="البروتين جرام"
+                      value={newIngProtein}
+                      onChange={(e) => setNewIngProtein(e.target.value)}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--glass-border)",
+                        background: "var(--glass)",
+                        color: "var(--text-primary)",
+                        fontSize: "12px",
+                      }}
+                    />
+                    <input
+                      type="number"
+                      placeholder="السعرات"
+                      value={newIngCalories}
+                      onChange={(e) => setNewIngCalories(e.target.value)}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--glass-border)",
+                        background: "var(--glass)",
+                        color: "var(--text-primary)",
+                        fontSize: "12px",
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    style={{
+                      padding: "8px",
+                      fontSize: "13px",
+                      marginTop: "4px",
+                    }}
+                  >
+                    + إضافة المكون
+                  </button>
+                </form>
+              )}
+            </div>
+
+            {/* Saved Confirmation Banner */}
             {saved && (
               <div
                 className="fade-in"
                 style={{
                   textAlign: "center",
                   padding: "10px",
-                  borderRadius: "10px",
-                  background: "rgba(34,197,94,0.08)",
-                  border: "1px solid rgba(34,197,94,0.2)",
+                  borderRadius: "12px",
+                  background: "rgba(34,197,94,0.1)",
+                  border: "1px solid rgba(34,197,94,0.22)",
                   color: "#16a34a",
                   fontSize: "13px",
-                  marginBottom: "16px",
+                  marginBottom: "18px",
                 }}
               >
-                ✅ تم تسجيل الوجبة في سجلك
+                {t.savedConfirmation}
               </div>
             )}
 
@@ -805,14 +1222,14 @@ export default function Home() {
                     d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                عرض السجل
+                {t.btnViewHistory}
               </button>
               <button
                 className="btn-outline"
                 style={{ flex: 1, height: "48px", fontSize: "14px" }}
                 onClick={reset}
               >
-                تحليل طبق آخر
+                {t.btnAnalyzeAnother}
               </button>
             </div>
           </div>

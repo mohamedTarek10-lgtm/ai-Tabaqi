@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useAuth, SignInButton } from "@clerk/nextjs";
+import { useLang } from "../i18n-context";
 
 // Group meals by relative date label
-function groupByDate(meals) {
+function groupByDate(meals, t, lang) {
   const groups = {};
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -15,9 +16,9 @@ function groupByDate(meals) {
     const d = new Date(meal.createdAt);
     const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     let label;
-    if (day.getTime() === today.getTime())     label = "اليوم";
-    else if (day.getTime() === yesterday.getTime()) label = "أمس";
-    else label = d.toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" });
+    if (day.getTime() === today.getTime()) label = t.today;
+    else if (day.getTime() === yesterday.getTime()) label = t.yesterday;
+    else label = d.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { weekday: "long", day: "numeric", month: "short" });
 
     if (!groups[label]) groups[label] = [];
     groups[label].push(meal);
@@ -25,7 +26,6 @@ function groupByDate(meals) {
   return groups;
 }
 
-// Confidence dot color
 function confColor(c) {
   if (c === "high")   return "#22c55e";
   if (c === "medium") return "#f59e0b";
@@ -34,44 +34,78 @@ function confColor(c) {
 
 export default function HistoryPage() {
   const { isSignedIn, isLoaded } = useAuth();
-  const [meals,   setMeals]   = useState([]);
+  const { t, lang } = useLang();
+  const [meals, setMeals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState("");
+  const [error, setError] = useState("");
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    setIsOffline(!navigator.onLine);
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isLoaded) return;
-    if (!isSignedIn) { setLoading(false); return; }
+    if (!isSignedIn) {
+      setLoading(false);
+      return;
+    }
+
+    // Try loading offline cache first
+    const cached = localStorage.getItem("luqmati-meals-cache");
+    if (cached) {
+      try {
+        setMeals(JSON.parse(cached));
+        setLoading(false);
+      } catch (e) {}
+    }
 
     async function fetchMeals() {
       try {
-        const res  = await fetch("/api/meals");
+        const res = await fetch("/api/meals");
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "حصل خطأ.");
-        setMeals(data.meals || []);
+        if (!res.ok) throw new Error(data.error || t.analysisError);
+        const fetched = data.meals || [];
+        setMeals(fetched);
+        // Cache for offline history access
+        localStorage.setItem("luqmati-meals-cache", JSON.stringify(fetched));
       } catch (err) {
-        setError(err.message);
+        if (!cached) setError(err.message);
       } finally {
         setLoading(false);
       }
     }
-    fetchMeals();
-  }, [isLoaded, isSignedIn]);
 
-  // ── Not signed in ────────────────────────────────────────────────────────
+    if (navigator.onLine) {
+      fetchMeals();
+    } else {
+      setLoading(false);
+    }
+  }, [isLoaded, isSignedIn, t.analysisError]);
+
+  // ── Not Signed In ─────────────────────────────────────────────────────────
   if (isLoaded && !isSignedIn) {
     return (
       <div style={{ minHeight: "80dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", textAlign: "center" }}>
-        <div className="glass-card" style={{ padding: "40px 32px", maxWidth: "360px", width: "100%" }}>
+        <div className="glass-card fade-in" style={{ padding: "40px 28px", maxWidth: "380px", width: "100%" }}>
           <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔒</div>
           <h2 style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "10px" }}>
-            لازم تسجل دخول
+            {t.loginRequired}
           </h2>
           <p style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "24px" }}>
-            عشان تشوف سجل وجباتك، سجل دخول أو عمل حساب جديد
+            {t.loginToSeeHistory}
           </p>
           <SignInButton mode="modal">
             <button className="btn-primary" style={{ width: "100%", height: "48px", fontSize: "15px" }}>
-              سجل دخول
+              {t.btnLoginNow}
             </button>
           </SignInButton>
         </div>
@@ -85,120 +119,127 @@ export default function HistoryPage() {
       <div style={{ minHeight: "80dvh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" }}>
           <div className="spinner" />
-          <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>جاري تحميل سجلك...</p>
+          <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>{t.historyLoading}</p>
         </div>
       </div>
     );
   }
 
   // ── Error ─────────────────────────────────────────────────────────────────
-  if (error) {
+  if (error && meals.length === 0) {
     return (
       <div style={{ minHeight: "80dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
         <div style={{ textAlign: "center", color: "#dc2626", fontSize: "14px" }}>
           <p>⚠️ {error}</p>
           <button className="btn-outline" style={{ marginTop: "16px", padding: "10px 20px" }} onClick={() => window.location.reload()}>
-            حاول تاني
+            {t.retry}
           </button>
         </div>
       </div>
     );
   }
 
-  const groups = groupByDate(meals);
+  const groups = groupByDate(meals, t, lang);
   const groupKeys = Object.keys(groups);
 
-  // ── Empty state ───────────────────────────────────────────────────────────
+  // ── Empty State ───────────────────────────────────────────────────────────
   if (groupKeys.length === 0) {
     return (
       <div style={{ minHeight: "80dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", textAlign: "center" }}>
         <div style={{ fontSize: "60px", marginBottom: "16px" }}>🍽️</div>
         <h2 style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "8px" }}>
-          السجل فاضي لسه
+          {t.historyEmpty}
         </h2>
         <p style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "24px" }}>
-          صوّر أي طبق وحلّله عشان يتسجل هنا
+          {t.historyEmptyHint}
         </p>
         <a href="/" className="btn-primary" style={{ padding: "12px 28px", fontSize: "15px", textDecoration: "none" }}>
-          حلّل طبق دلوقتي
+          {t.btnAnalyzeNow}
         </a>
       </div>
     );
   }
 
-  // ── Meals list ────────────────────────────────────────────────────────────
+  // ── Meals List ────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "80dvh", padding: "24px 16px" }}>
+    <div style={{ minHeight: "80dvh", padding: "24px 16px 40px" }}>
       <div style={{ maxWidth: "560px", margin: "0 auto" }}>
 
-        {/* Header */}
-        <div style={{ marginBottom: "28px" }}>
-          <h1
-            className="font-arabic"
-            style={{ fontSize: "28px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}
+        {/* Offline indicator */}
+        {isOffline && (
+          <div
+            style={{
+              padding: "8px 12px",
+              borderRadius: "10px",
+              background: "rgba(245,158,11,0.12)",
+              border: "1px solid rgba(245,158,11,0.22)",
+              color: "#b45309",
+              fontSize: "12px",
+              marginBottom: "16px",
+              textAlign: "center",
+            }}
           >
-            السجل
-          </h1>
-          <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-            {meals.length} وجبة مسجلة
-          </p>
+            📶 {t.offlineHistoryMsg}
+          </div>
+        )}
+
+        {/* Header */}
+        <div style={{ marginBottom: "28px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <div>
+            <h1 className="font-arabic" style={{ fontSize: "28px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
+              {t.historyTitle}
+            </h1>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+              {meals.length} {t.mealsCount}
+            </p>
+          </div>
         </div>
 
-        {/* Groups */}
+        {/* Date Groups */}
         {groupKeys.map((label, gi) => (
           <div key={label} className={`fade-in fade-in-delay-${Math.min(gi + 1, 4)}`} style={{ marginBottom: "28px" }}>
-            <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
               {label}
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {groups[label].map((meal) => {
-                const time = new Date(meal.createdAt).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+                const time = new Date(meal.createdAt).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "2-digit", minute: "2-digit" });
                 return (
                   <div key={meal.id} className="meal-row">
-                    {/* Thumbnail placeholder */}
                     <div
                       className="meal-thumbnail"
                       style={{
-                        background: "linear-gradient(135deg, rgba(124,58,237,0.15), rgba(167,139,250,0.1))",
+                        background: "linear-gradient(135deg, rgba(108,63,212,0.18), rgba(236,72,153,0.12))",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         fontSize: "24px",
-                        flexShrink: 0,
                       }}
                     >
                       🍽️
                     </div>
 
-                    {/* Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontWeight: 600, fontSize: "15px", color: "var(--text-primary)", marginBottom: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {meal.foodNameArabic || meal.foodName}
+                      <p style={{ fontWeight: 700, fontSize: "15px", color: "var(--text-primary)", marginBottom: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {lang === "ar" ? (meal.foodNameArabic || meal.foodName) : (meal.foodName || meal.foodNameArabic)}
                       </p>
+
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--text-secondary)" }}>
-                        <span
-                          style={{ width: "8px", height: "8px", borderRadius: "50%", background: confColor(meal.confidence), flexShrink: 0 }}
-                        />
-                        <span className="font-english">{meal.calories ?? "—"} kcal</span>
+                        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: confColor(meal.confidence), flexShrink: 0 }} />
+                        <span className="font-english">{meal.calories ?? "—"} {t.kcal}</span>
                         <span>·</span>
                         <span>{time}</span>
                       </div>
 
-                      {/* Mini macro row */}
                       {(meal.protein || meal.carbs || meal.fats) && (
-                        <div style={{ display: "flex", gap: "10px", marginTop: "5px", fontSize: "11px" }}>
+                        <div style={{ display: "flex", gap: "10px", marginTop: "6px", fontSize: "11px", fontWeight: 600 }}>
                           {meal.protein && <span style={{ color: "var(--color-protein)" }}>💪 {meal.protein}g</span>}
                           {meal.carbs   && <span style={{ color: "var(--color-carbs)"   }}>🍚 {meal.carbs}g</span>}
                           {meal.fats    && <span style={{ color: "var(--color-fats)"    }}>🥑 {meal.fats}g</span>}
                         </div>
                       )}
                     </div>
-
-                    {/* Chevron */}
-                    <svg width="16" height="16" fill="none" stroke="var(--text-muted)" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                    </svg>
                   </div>
                 );
               })}
