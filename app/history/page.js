@@ -134,7 +134,7 @@ export default function HistoryPage() {
   if (error && meals.length === 0) {
     return (
       <div style={{ minHeight: "80dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-        <div style={{ textAlign: "center", color: "#dc2626", fontSize: "14px" }}>
+        <div style={{ textAlign: "center", color: "var(--status-error)", fontSize: "14px" }}>
           <p>⚠️ {error}</p>
           <button className="btn-outline" style={{ marginTop: "16px", padding: "10px 20px" }} onClick={() => window.location.reload()}>
             {t.retry}
@@ -176,9 +176,9 @@ export default function HistoryPage() {
             style={{
               padding: "8px 12px",
               borderRadius: "10px",
-              background: "rgba(245,158,11,0.12)",
-              border: "1px solid rgba(245,158,11,0.22)",
-              color: "#b45309",
+              background: "var(--status-warning-bg)",
+              border: "1px solid var(--status-warning-border)",
+              color: "var(--status-warning)",
               fontSize: "12px",
               marginBottom: "16px",
               textAlign: "center",

@@ -1,9 +1,33 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import localFont from "next/font/local";
 import Script from "next/script";
 import "./globals.css";
 import ClientProviders from "./client-providers";
 import { HeaderNav, FooterBranding } from "./header-nav";
 import MobileNavigation from "./mobile-navigation";
+
+const arabicBrand = localFont({
+  src: "../public/fonts/arabicFont/alfont_com_InkBrushArabic_DEMO-Textured.otf",
+  variable: "--font-arabic",
+  display: "swap",
+});
+
+const metana = localFont({
+  src: [
+    {
+      path: "../public/fonts/englishFontbtn/NeueMetanaMono-Light.otf",
+      weight: "300 500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/englishFontbtn/NeueMetanaMono-SemiBold.otf",
+      weight: "600 800",
+      style: "normal",
+    },
+  ],
+  variable: "--font-metana",
+  display: "swap",
+});
 
 export const metadata = {
   title: {
@@ -98,7 +122,7 @@ export default function RootLayout({ children }) {
   };
 
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning style={{ scrollBehavior: "smooth" }}>
+    <html lang="ar" dir="rtl" suppressHydrationWarning className={[arabicBrand.variable, metana.variable].join(" ")} style={{ scrollBehavior: "smooth" }}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta id="theme-color-meta" name="theme-color" content="#06040f" />

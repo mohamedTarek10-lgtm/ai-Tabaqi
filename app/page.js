@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useSyncExternalStore } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { useLang } from "./i18n-context";
 import ProteinRing from "./protein-ring";
 import InstallPrompt from "./install-prompt";
@@ -103,6 +104,7 @@ function MacroCard({ emoji, label, value, unit, colorClass, delay }) {
 export default function Home() {
   const { isSignedIn, isLoaded } = useAuth();
   const { t, lang } = useLang();
+  const router = useRouter();
 
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -339,12 +341,12 @@ export default function Home() {
           className="fade-in"
           style={{
             width: "100%",
-            maxWidth: "520px",
+            maxWidth: "600px",
             padding: "12px 16px",
             borderRadius: "14px",
-            background: "rgba(239, 68, 68, 0.12)",
-            border: "1px solid rgba(239, 68, 68, 0.25)",
-            color: "#ef4444",
+            background: "var(--status-error-bg)",
+            border: "1px solid var(--status-error-border)",
+            color: "var(--status-error)",
             fontSize: "13px",
             marginBottom: "16px",
             textAlign: "center",
@@ -365,7 +367,7 @@ export default function Home() {
           className="glass-card fade-in"
           style={{
             width: "100%",
-            maxWidth: "520px",
+            maxWidth: "600px",
             padding: "36px 28px 32px",
             display: "flex",
             flexDirection: "column",
@@ -506,6 +508,7 @@ export default function Home() {
               <img
                 src={preview}
                 alt="food preview"
+                decoding="async"
                 style={{
                   width: "100%",
                   maxHeight: "260px",
@@ -577,9 +580,9 @@ export default function Home() {
                 width: "100%",
                 padding: "12px 16px",
                 borderRadius: "12px",
-                background: "rgba(239,68,68,0.09)",
-                border: "1px solid rgba(239,68,68,0.22)",
-                color: "#dc2626",
+                background: "var(--status-error-bg)",
+                border: "1px solid var(--status-error-border)",
+                color: "var(--status-error)",
                 fontSize: "13px",
                 marginBottom: "16px",
                 textAlign: "center",
@@ -797,6 +800,7 @@ export default function Home() {
               <img
                 src={preview}
                 alt={result.foodNameArabic || result.foodName}
+                decoding="async"
                 style={{
                   width: "100%",
                   height: "230px",
@@ -879,9 +883,9 @@ export default function Home() {
                 style={{
                   padding: "10px 14px",
                   borderRadius: "12px",
-                  background: "rgba(245,158,11,0.09)",
-                  border: "1px solid rgba(245,158,11,0.22)",
-                  color: "#b45309",
+                  background: "var(--status-warning-bg)",
+                  border: "1px solid var(--status-warning-border)",
+                  color: "var(--status-warning)",
                   fontSize: "12px",
                   marginBottom: "18px",
                 }}
@@ -1265,9 +1269,9 @@ export default function Home() {
                   textAlign: "center",
                   padding: "10px",
                   borderRadius: "12px",
-                  background: "rgba(34,197,94,0.1)",
-                  border: "1px solid rgba(34,197,94,0.22)",
-                  color: "#16a34a",
+                  background: "var(--status-success-bg)",
+                  border: "1px solid var(--status-success-border)",
+                  color: "var(--status-success)",
                   fontSize: "13px",
                   marginBottom: "18px",
                 }}
@@ -1281,7 +1285,7 @@ export default function Home() {
               <button
                 className="btn-primary"
                 style={{ flex: 1, height: "48px", fontSize: "14px" }}
-                onClick={() => (window.location.href = "/history")}
+                onClick={() => router.push("/history")}
               >
                 <svg
                   width="17"

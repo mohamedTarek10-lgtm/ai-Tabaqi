@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function TestAI() {
   const [image, setImage] = useState(null);
@@ -8,6 +8,12 @@ export default function TestAI() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
 
   function handleImageChange(event) {
     const file = event.target.files?.[0];
@@ -58,7 +64,7 @@ export default function TestAI() {
       <input type="file" accept="image/*" onChange={handleImageChange} />
       {preview && (
         <div style={{ marginTop: "20px" }}>
-          <img src={preview} alt="Food preview" style={{ width: "300px", maxWidth: "100%", borderRadius: "16px" }} />
+          <img src={preview} alt="Food preview" decoding="async" style={{ width: "300px", maxWidth: "100%", borderRadius: "16px" }} />
         </div>
       )}
       <button

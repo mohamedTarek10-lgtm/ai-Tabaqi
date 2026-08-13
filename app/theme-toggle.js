@@ -33,7 +33,7 @@ export default function ThemeToggle() {
     const root = document.documentElement;
     if (animate) {
       root.classList.add("theme-transitioning");
-      setTimeout(() => root.classList.remove("theme-transitioning"), 450);
+      setTimeout(() => root.classList.remove("theme-transitioning"), 300);
     }
     root.dataset.theme = next;
     const themeMeta = document.getElementById("theme-color-meta");
