@@ -20,17 +20,18 @@ export async function GET() {
 
     const windowStart = new Date(Date.now() - ANALYSIS_WINDOW_MS);
 
-    const [{ value: recentCount }] = await db
-      .select({ value: count() })
-      .from(meals)
-      .where(and(eq(meals.userId, userId), gte(meals.createdAt, windowStart)));
-
-    const oldest = await db
-      .select({ createdAt: meals.createdAt })
-      .from(meals)
-      .where(and(eq(meals.userId, userId), gte(meals.createdAt, windowStart)))
-      .orderBy(meals.createdAt)
-      .limit(1);
+    const [[{ value: recentCount }], oldest] = await Promise.all([
+      db
+        .select({ value: count() })
+        .from(meals)
+        .where(and(eq(meals.userId, userId), gte(meals.createdAt, windowStart))),
+      db
+        .select({ createdAt: meals.createdAt })
+        .from(meals)
+        .where(and(eq(meals.userId, userId), gte(meals.createdAt, windowStart)))
+        .orderBy(meals.createdAt)
+        .limit(1),
+    ]);
 
     const resetAt = oldest.length > 0
       ? new Date(oldest[0].createdAt.getTime() + ANALYSIS_WINDOW_MS).toISOString()

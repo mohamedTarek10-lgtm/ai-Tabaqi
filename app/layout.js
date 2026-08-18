@@ -1,10 +1,17 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import { Inter } from "next/font/google";
 import localFont from "next/font/local";
 import Script from "next/script";
 import "./globals.css";
 import ClientProviders from "./client-providers";
 import { HeaderNav, FooterBranding } from "./header-nav";
 import MobileNavigation from "./mobile-navigation";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 const arabicBrand = localFont({
   src: "../public/fonts/arabicFont/alfont_com_InkBrushArabic_DEMO-Textured.otf",
@@ -30,6 +37,9 @@ const metana = localFont({
 });
 
 export const metadata = {
+  verification: {
+    google: "tQuHl7PaMtPtA0W1vUPDpH3JeK3RY71DOMQi99ZF9gE",
+  },
   title: {
     default: "لقمتي / Luqmati — تحليل السعرات والماكروز بالذكاء الاصطناعي",
     template: "%s | لقمتي Luqmati",
@@ -122,7 +132,7 @@ export default function RootLayout({ children }) {
   };
 
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning className={[arabicBrand.variable, metana.variable].join(" ")} style={{ scrollBehavior: "smooth" }}>
+    <html lang="ar" dir="rtl" suppressHydrationWarning className={[inter.variable, arabicBrand.variable, metana.variable].join(" ")} style={{ scrollBehavior: "smooth" }}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta id="theme-color-meta" name="theme-color" content="#06040f" />
