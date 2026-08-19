@@ -4,10 +4,11 @@ import { useUser, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useLang } from "../i18n-context";
+import { ProfileAvatarBadge } from "../profile-avatar";
 
 export default function ProfilePage() {
   const { user, isLoaded, isSignedIn } = useUser();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [mealCount, setMealCount] = useState(null);
   const [gender, setGender] = useState(user?.publicMetadata?.gender === "female" ? "female" : "male");
   const [savingGender, setSavingGender] = useState(false);
@@ -67,9 +68,7 @@ export default function ProfilePage() {
     return (
       <div style={{ minHeight: "80dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", textAlign: "center" }}>
         <div className="glass-card fade-in" style={{ padding: "40px 28px", maxWidth: "380px", width: "100%" }}>
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>
-            <AthleticProfileIcon width={48} height={48} />
-          </div>
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>👤</div>
           <h2 style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "10px" }}>
             {t.loginRequired}
           </h2>
@@ -103,9 +102,7 @@ export default function ProfilePage() {
             gap: "16px",
           }}
         >
-          <div>
-            <UserButton afterSignOutUrl="/" />
-          </div>
+          <ProfileAvatarBadge gender={gender} size={56} />
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontWeight: 700, fontSize: "16px", color: "var(--text-primary)", marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -114,60 +111,6 @@ export default function ProfilePage() {
             <p style={{ fontSize: "13px", color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {user?.primaryEmailAddress?.emailAddress}
             </p>
-          </div>
-        </div>
-
-        {/* Athletic Avatar Persona Selection */}
-        <div className="glass-card fade-in fade-in-delay-1" style={{ padding: "18px 20px", marginBottom: "16px" }}>
-          <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            أيقونة الحساب الشخصي (Athletic Persona)
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <button
-              type="button"
-              onClick={() => setGender("male")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                padding: "12px",
-                borderRadius: "12px",
-                border: gender === "male" ? "2px solid var(--brand)" : "1px solid var(--glass-border)",
-                background: gender === "male" ? "var(--bg-subtle)" : "var(--glass)",
-                color: "var(--text-primary)",
-                fontWeight: 600,
-                fontSize: "13px",
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-            >
-              <AthleticProfileIcon width={20} height={20} />
-              <span>♂️ رجل (رياضي)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setGender("female")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                padding: "12px",
-                borderRadius: "12px",
-                border: gender === "female" ? "2px solid var(--brand)" : "1px solid var(--glass-border)",
-                background: gender === "female" ? "var(--bg-subtle)" : "var(--glass)",
-                color: "var(--text-primary)",
-                fontWeight: 600,
-                fontSize: "13px",
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-            >
-              <AthleticProfileIcon width={20} height={20} />
-              <span>♀️ امرأة (رياضية)</span>
-            </button>
           </div>
         </div>
 
