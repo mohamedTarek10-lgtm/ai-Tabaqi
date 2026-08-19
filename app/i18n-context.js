@@ -28,12 +28,17 @@ const strings = {
     btnViewHistory: "عرض السجل",
     btnAnalyzeAnother: "تحليل طبق آخر",
     analyzing: "جاري تحليل طبقك...",
-    preparingImage: "جاري تجهيز الصورة...",
+    preparingImage: "جاري تجهيز الصورة ضغطاً وتحسناً...",
     aiAnalyzing: "جاري التعرف على مكونات الطبق بالذكاء الاصطناعي...",
     signInToAnalyze: "لازم تسجل دخول عشان تحلل الطبق وتحفظه",
     btnSignIn: "تسجيل الدخول",
     savedConfirmation: "✅ تم تسجيل الوجبة في سجلك",
     lowConfidenceNote: "⚠️ القيم دي تقديرية وممكن تكون مش دقيقة جداً بسبب جودة الصورة أو التنوع في طريقة التحضير.",
+    tabFile: "رفع صورة",
+    tabUrl: "رابط صورة (Web/Google)",
+    btnUrlLoad: "جلب وتجهيز الصورة",
+    urlPlaceholder: "ضع رابط الصورة هنا (مثال: https://...)",
+    urlError: "تعذر جلب الصورة من الرابط. تأكد من صحة رابط الصورة.",
 
     // Macros
     calories: "السعرات",
@@ -86,6 +91,13 @@ const strings = {
     imageConversionFailed: "الصيغة دي مش مدعومة على جهازك. حوّل الصورة لـJPG أو PNG وحاول تاني.",
     btnRetry: "حاول تاني",
 
+    // Guest trial
+    guestTrialBanner: "🎁 تحليل مجاني واحد للزوار — سجّل دخولك للاستمرار",
+    guestTrialResult: "✅ تم التحليل! سجّل دخولك لحفظ النتيجة والاستمرار",
+    guestTrialExpired: "استخدمت تجربتك المجانية. سجّل دخولك لتحليلات غير محدودة.",
+    btnSignInToSave: "سجّل دخولك وحفظ النتيجة",
+    btnSignInContinue: "سجّل دخول للاستمرار",
+
     // Offline
     offlineTitle: "مفيش إنترنت",
     offlineAnalysisMsg: "عشان تحلل أكل جديد، محتاج اتصال بالإنترنت.",
@@ -121,12 +133,17 @@ const strings = {
     btnViewHistory: "View History",
     btnAnalyzeAnother: "Analyze Another",
     analyzing: "Analyzing your plate...",
-    preparingImage: "Preparing your image...",
+    preparingImage: "Optimizing & compressing image...",
     aiAnalyzing: "AI is identifying the food and ingredients...",
     signInToAnalyze: "Sign in to analyze your plate and save your results",
     btnSignIn: "Sign In",
     savedConfirmation: "✅ Meal saved to your history",
     lowConfidenceNote: "⚠️ These values are estimates and may not be fully accurate due to image quality or recipe variation.",
+    tabFile: "Upload Photo",
+    tabUrl: "Image Link (Web/Google)",
+    btnUrlLoad: "Fetch & Prepare Image",
+    urlPlaceholder: "Paste image URL here (e.g. https://...)",
+    urlError: "Could not fetch image from link. Please check the URL.",
 
     // Macros
     calories: "Calories",
@@ -170,14 +187,21 @@ const strings = {
     defaultUserName: "Luqmati User",
 
     // Errors
-    noImage: "Please choose a food photo first.",
-    notSignedIn: "You need to sign in before analyzing.",
-    imageTooLarge: "Image is over 10MB. Please choose a smaller one.",
-    notAnImage: "That file is not an image. Please choose an image.",
-    analysisError: "Something went wrong during analysis. Please try again.",
-    analysisTimeout: "Analysis took too long. Please try again with a clearer image.",
-    imageConversionFailed: "This format is not supported on this device. Convert it to JPG or PNG and try again.",
+    noImage: "Choose a food photo first.",
+    notSignedIn: "You need to sign in to analyze your plate.",
+    imageTooLarge: "Image is larger than 10MB. Choose a smaller image.",
+    notAnImage: "That file is not an image. Choose a different file.",
+    analysisError: "Something went wrong during analysis, please try again.",
+    analysisTimeout: "Analysis took too long. Try again with a clearer photo.",
+    imageConversionFailed: "This image format isn't supported on your device. Convert to JPG or PNG and try again.",
     btnRetry: "Try Again",
+
+    // Guest trial
+    guestTrialBanner: "🎁 One free guest analysis — sign in to continue",
+    guestTrialResult: "✅ Analysis done! Sign in to save it and keep going",
+    guestTrialExpired: "You've used your free trial. Sign in for unlimited analyses.",
+    btnSignInToSave: "Sign In & Save Result",
+    btnSignInContinue: "Sign In to Continue",
 
     // Offline
     offlineTitle: "No Internet",

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="currentColor">
+  <!-- Athletic Male Profile Silhouette -->
+  <!-- Head turned in side profile -->
+  <path d="M 50 14 C 54.5 14 58.2 16.8 59.5 21 C 60.5 24 59.8 27.5 60.5 29.5 C 61 31 59.5 32 58.5 31.5 C 57 30.5 56.5 28.5 55 28 C 53.5 27.5 51.5 28.5 50.5 30 C 49.5 31.5 50 34 50 35.5 C 45 36.5 42 32 42 25 C 42 18.9 45.6 14 50 14 Z" />
+  <!-- Neck and muscular traps -->
+  <path d="M 45 34 C 47.5 34 51 34.5 52.5 36.5 C 55 39.5 59.5 41 64 42.5 C 72 45 77 50 79 57 C 80 60.5 78.5 69.5 77 72 L 67 72 L 67 60 C 65 56 61 54 57.5 54 L 42.5 54 C 39 54 35 56 33 60 L 33 72 L 23 72 C 21.5 69.5 20 60.5 21 57 C 23 50 28 45 36 42.5 C 40.5 41 43.5 38 45 34 Z" />
+  <!-- Defined chest contours (line highlights) -->
+  <path d="M 34 52 Q 42 57 48 53" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+  <path d="M 66 52 Q 58 57 52 53" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+</svg>

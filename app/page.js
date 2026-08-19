@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useSyncExternalStore, memo } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useLang } from "./i18n-context";
@@ -32,32 +33,83 @@ function getOnlineStatus() {
   return typeof navigator === "undefined" ? true : navigator.onLine;
 }
 
-async function convertToProviderImage(file) {
-  if (PROVIDER_IMAGE_TYPES.has(file.type)) return file;
+async function convertToProviderImage(source) {
+  let blob;
+  let filename = "food.jpg";
 
-  const objectUrl = URL.createObjectURL(file);
+  if (typeof source === "string") {
+    try {
+      const res = await fetch(source, { mode: "cors" });
+      if (!res.ok) throw new Error("fetch_failed");
+      blob = await res.blob();
+    } catch {
+      throw new Error("url_fetch_failed");
+    }
+  } else if (source instanceof File || source instanceof Blob) {
+    blob = source;
+    if (source.name) filename = source.name;
+  } else {
+    throw new Error("invalid_source");
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
   try {
-    const image = new Image();
+    const image = document.createElement("img");
+    image.crossOrigin = "anonymous";
     image.decoding = "async";
     image.src = objectUrl;
-    await image.decode();
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error("conversion_failed"));
+    });
 
     const canvas = document.createElement("canvas");
-    const scale = Math.min(1, 2400 / Math.max(image.naturalWidth, image.naturalHeight));
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+    const maxDimension = 2000;
+    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth || 1000, image.naturalHeight || 1000));
+    canvas.width = Math.max(1, Math.round((image.naturalWidth || 1000) * scale));
+    canvas.height = Math.max(1, Math.round((image.naturalHeight || 1000) * scale));
 
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
-    if (!blob) throw new Error("conversion_failed");
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    }
 
-    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", {
+    const compressedBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    if (!compressedBlob) throw new Error("conversion_failed");
+
+    return new File([compressedBlob], filename.replace(/\.[^.]+$/, "") + ".jpg", {
       type: "image/jpeg",
       lastModified: Date.now(),
     });
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
+}
+
+function AnalysisSkeleton() {
+  return (
+    <div
+      className="glass-card fade-in"
+      style={{
+        width: "100%",
+        maxWidth: "520px",
+        padding: "28px 24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "18px",
+      }}
+    >
+      <div style={{ width: "50%", height: "24px", background: "var(--bg-subtle)", borderRadius: "8px", animation: "pulse 1.5s infinite" }} />
+      <div style={{ width: "100%", height: "210px", background: "var(--bg-subtle)", borderRadius: "18px", animation: "pulse 1.5s infinite" }} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+        <div style={{ height: "72px", background: "var(--bg-subtle)", borderRadius: "14px", animation: "pulse 1.5s infinite" }} />
+        <div style={{ height: "72px", background: "var(--bg-subtle)", borderRadius: "14px", animation: "pulse 1.5s infinite" }} />
+        <div style={{ height: "72px", background: "var(--bg-subtle)", borderRadius: "14px", animation: "pulse 1.5s infinite" }} />
+      </div>
+    </div>
+  );
 }
 
 function confidenceLabel(c, t) {
@@ -119,6 +171,11 @@ export default function Home() {
   const [usage, setUsage] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [inputTab, setInputTab] = useState("file");
+  const [urlInput, setUrlInput] = useState("");
+  const [urlFetching, setUrlFetching] = useState(false);
+  // Guest trial: true = guest result shown (not saved yet)
+  const [isGuestResult, setIsGuestResult] = useState(false);
   const isOffline = !useSyncExternalStore(subscribeToOnlineStatus, getOnlineStatus, () => true);
 
   // Manual ingredient edit state
@@ -171,6 +228,25 @@ export default function Home() {
     }
   }, [t]);
 
+  const handleUrlSubmit = async (e) => {
+    e?.preventDefault();
+    if (!urlInput.trim()) return;
+    try {
+      setUrlFetching(true);
+      setError("");
+      const preparedFile = await convertToProviderImage(urlInput.trim());
+      setFile(preparedFile);
+      setPreview(URL.createObjectURL(preparedFile));
+      setResult(null);
+      setSaved(false);
+      setRateLimitInfo(null);
+    } catch (err) {
+      setError(err.message === "url_fetch_failed" ? (t.urlError || "تعذر جلب الصورة من الرابط.") : t.imageConversionFailed);
+    } finally {
+      setUrlFetching(false);
+    }
+  };
+
   const onFileInput = (e) => {
     void handleFile(e.target.files?.[0]);
   };
@@ -195,15 +271,79 @@ export default function Home() {
       setError(t.noImage);
       return;
     }
+
+    // ── Guest trial flow ────────────────────────────────────────────────────
     if (!isSignedIn) {
-      setError(t.notSignedIn);
+      const guestUsed = localStorage.getItem("luqmati-guest-trial") === "1";
+      if (guestUsed) {
+        // Guest has already used their free trial — force sign-in
+        document.dispatchEvent(new CustomEvent("luqmati:openSignIn"));
+        return;
+      }
+
+      // Run free guest analysis
+      try {
+        setLoading(true);
+        setError("");
+        setResult(null);
+        setIsGuestResult(false);
+        setSaved(false);
+        setRateLimitInfo(null);
+
+        setAnalyzingStep(t.preparingImage);
+        await new Promise((r) => setTimeout(r, 300));
+        setAnalyzingStep(t.aiAnalyzing);
+
+        const form = new FormData();
+        form.append("image", file);
+
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 65_000);
+
+        let res;
+        try {
+          res = await fetch("/api/analyze-food-guest", {
+            method: "POST",
+            body: form,
+            signal: controller.signal,
+          });
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data.error || t.analysisError);
+        }
+
+        // Mark guest trial as used
+        localStorage.setItem("luqmati-guest-trial", "1");
+
+        setResult(data.result);
+        setEditableIngredients(data.result?.ingredients || []);
+        setIsGuestResult(true); // show sign-in CTA instead of "saved"
+      } catch (err) {
+        if (err?.name === "AbortError") {
+          setError(t.analysisTimeout);
+        } else if (!navigator.onLine || err?.name === "TypeError") {
+          setError(t.offlineAnalysisMsg);
+        } else {
+          setError(err.message || t.analysisError);
+        }
+      } finally {
+        setLoading(false);
+        setAnalyzingStep("");
+      }
       return;
     }
 
+    // ── Signed-in analysis flow ─────────────────────────────────────────────
     try {
       setLoading(true);
       setError("");
       setResult(null);
+      setIsGuestResult(false);
       setSaved(false);
       setRateLimitInfo(null);
 
@@ -215,7 +355,7 @@ export default function Home() {
       form.append("image", file);
 
       const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 60_000);
+      const timeoutId = window.setTimeout(() => controller.abort(), 65_000);
 
       let res;
       try {
@@ -267,6 +407,7 @@ export default function Home() {
     setError("");
     setSaved(false);
     setRateLimitInfo(null);
+    setUrlInput("");
     if (fileInput.current) fileInput.current.value = "";
     if (cameraInput.current) cameraInput.current.value = "";
   }
@@ -404,8 +545,98 @@ export default function Home() {
             {t.heroSubtitle}
           </p>
 
-          {/* Upload Zone / Image Preview */}
-          {!preview ? (
+          {/* Mode Switcher Tabs */}
+          {!preview && (
+            <div
+              style={{
+                display: "flex",
+                gap: "6px",
+                marginBottom: "20px",
+                background: "var(--bg-subtle)",
+                padding: "4px",
+                borderRadius: "12px",
+                width: "100%",
+                maxWidth: "360px",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setInputTab("file")}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: inputTab === "file" ? "var(--brand)" : "transparent",
+                  color: inputTab === "file" ? "#ffffff" : "var(--text-primary)",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+              >
+                📁 {t.tabFile || "رفع صورة"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputTab("url")}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: inputTab === "url" ? "var(--brand)" : "transparent",
+                  color: inputTab === "url" ? "#ffffff" : "var(--text-primary)",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+              >
+                🔗 {t.tabUrl || "رابط صورة"}
+              </button>
+            </div>
+          )}
+
+          {/* Upload Zone / URL Form / Image Preview */}
+          {inputTab === "url" && !preview ? (
+            <form
+              onSubmit={handleUrlSubmit}
+              style={{
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+                marginBottom: "24px",
+              }}
+            >
+              <input
+                type="url"
+                placeholder={t.urlPlaceholder || "ضع رابط الصورة هنا (https://...)"}
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                required
+                style={{
+                  width: "100%",
+                  height: "48px",
+                  padding: "0 16px",
+                  borderRadius: "12px",
+                  border: "1px solid var(--glass-border)",
+                  background: "var(--glass)",
+                  color: "var(--text-primary)",
+                  fontSize: "13px",
+                }}
+              />
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={urlFetching || !urlInput.trim()}
+                style={{ height: "48px", fontSize: "14px" }}
+              >
+                {urlFetching ? (t.preparingImage || "جاري جلب الصورة...") : (t.btnUrlLoad || "جلب وتجهيز الصورة")}
+              </button>
+            </form>
+          ) : !preview ? (
             <div
               className={`upload-zone ${dragOver ? "drag-active" : ""}`}
               style={{
@@ -434,7 +665,7 @@ export default function Home() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 8px 24px rgb(108 63 212 / 0.35)",
+                  boxShadow: "0 8px 24px rgba(116, 190, 48, 0.35)",
                 }}
               >
                 <svg
@@ -475,9 +706,12 @@ export default function Home() {
                 position: "relative",
               }}
             >
-              <img
+              <Image
                 src={preview}
                 alt="food preview"
+                width={600}
+                height={260}
+                unoptimized
                 decoding="async"
                 style={{
                   width: "100%",
@@ -664,7 +898,7 @@ export default function Home() {
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
-                    gap: "12px",
+                    gap: "16px",
                   }}
                 >
                   <div className="spinner" />
@@ -672,44 +906,56 @@ export default function Home() {
                     style={{
                       color: "var(--text-secondary)",
                       fontSize: "14px",
-                      fontWeight: 500,
+                      fontWeight: 600,
                     }}
                   >
                     {analyzingStep || t.analyzing}
                   </p>
+                  <AnalysisSkeleton />
                 </div>
               )}
 
               {!loading && (
                 <>
                   {!isLoaded ? null : !isSignedIn ? (
-                    <div
-                      style={{
-                        textAlign: "center",
-                        color: "var(--text-secondary)",
-                        fontSize: "13px",
-                        padding: "10px 0",
-                      }}
-                    >
-                      <p style={{ marginBottom: "12px" }}>
-                        {t.signInToAnalyze}
-                      </p>
+                    <>
                       <button
                         className="btn-primary"
                         style={{
-                          padding: "12px 24px",
-                          fontSize: "14px",
                           width: "100%",
+                          height: "52px",
+                          fontSize: "16px",
                         }}
-                        onClick={() =>
-                          document.dispatchEvent(
-                            new Event("clerk:open-sign-in"),
-                          )
-                        }
+                        onClick={analyzeFood}
+                        disabled={loading}
                       >
-                        {t.btnSignIn}
+                        <svg
+                          width="18"
+                          height="18"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
+                          />
+                        </svg>
+                        {t.btnAnalyze}
                       </button>
-                    </div>
+                      <p
+                        style={{
+                          textAlign: "center",
+                          fontSize: "12px",
+                          color: "var(--text-muted)",
+                          marginTop: "4px",
+                        }}
+                      >
+                        {t.guestTrialBanner || "🎁 تحليل مجاني واحد للزوار"}
+                      </p>
+                    </>
                   ) : (
                     <button
                       className="btn-primary"
@@ -767,9 +1013,12 @@ export default function Home() {
           {/* Header image & badges */}
           {preview && (
             <div style={{ position: "relative" }}>
-              <img
+              <Image
                 src={preview}
                 alt={result.foodNameArabic || result.foodName}
+                width={520}
+                height={230}
+                unoptimized
                 decoding="async"
                 style={{
                   width: "100%",
