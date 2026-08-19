@@ -11,12 +11,14 @@ import EditableIngredients from "./editable-ingredients";
 const InstallPrompt = dynamic(() => import("./install-prompt"), { ssr: false });
 const ProteinRing = dynamic(() => import("./protein-ring"));
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const PROVIDER_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/gif",
+  "image/heic",
+  "image/heif",
 ]);
 const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|gif|heic|heif|avif|bmp)$/i;
 

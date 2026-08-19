@@ -1,17 +1,17 @@
 "use client";
 
-import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
+import { useUser, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useLang } from "../i18n-context";
 
-import AthleticProfileIcon, { useGender } from "../athletic-profile-icon";
-
 export default function ProfilePage() {
   const { user, isLoaded, isSignedIn } = useUser();
   const { t } = useLang();
-  const { gender, setGender } = useGender();
   const [mealCount, setMealCount] = useState(null);
+  const [gender, setGender] = useState(user?.publicMetadata?.gender === "female" ? "female" : "male");
+  const [savingGender, setSavingGender] = useState(false);
+  const [genderError, setGenderError] = useState("");
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -32,6 +32,28 @@ export default function ProfilePage() {
       isMounted = false;
     };
   }, [isSignedIn]);
+
+  const handleGenderChange = async (nextGender) => {
+    if (!user || !isSignedIn) return;
+
+    setSavingGender(true);
+    setGenderError("");
+
+    try {
+      await user.update({
+        publicMetadata: {
+          ...(user.publicMetadata || {}),
+          gender: nextGender,
+        },
+      });
+      setGender(nextGender);
+    } catch (error) {
+      console.error("Failed to update profile gender:", error);
+      setGenderError(lang === "ar" ? "فشل تحديث نوعك. حاول مرة أخرى." : "Could not update your profile. Please try again.");
+    } finally {
+      setSavingGender(false);
+    }
+  };
 
   if (!isLoaded) {
     return (
@@ -71,7 +93,6 @@ export default function ProfilePage() {
           {t.profileTitle}
         </h1>
 
-        {/* User Card */}
         <div
           className="glass-card fade-in"
           style={{
@@ -82,26 +103,8 @@ export default function ProfilePage() {
             gap: "16px",
           }}
         >
-          <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div>
             <UserButton afterSignOutUrl="/" />
-            <div
-              style={{
-                position: "absolute",
-                bottom: "-4px",
-                right: "-4px",
-                width: "22px",
-                height: "22px",
-                borderRadius: "50%",
-                background: "var(--brand)",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
-              }}
-            >
-              <AthleticProfileIcon width={14} height={14} />
-            </div>
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -168,8 +171,50 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="glass-card fade-in fade-in-delay-1" style={{ padding: "20px 24px", marginBottom: "16px" }}>
+        <div className="glass-card fade-in fade-in-delay-1" style={{ padding: "18px 20px", marginBottom: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+            <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              {lang === "ar" ? "النوع" : "Gender"}
+            </span>
+            {savingGender ? <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{lang === "ar" ? "جارٍ الحفظ..." : "Saving..."}</span> : null}
+          </div>
+
+          <div style={{ display: "flex", gap: "8px" }}>
+            {[
+              { value: "male", label: lang === "ar" ? "ذكر" : "Male" },
+              { value: "female", label: lang === "ar" ? "أنثى" : "Female" },
+            ].map((option) => {
+              const selected = gender === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleGenderChange(option.value)}
+                  disabled={savingGender}
+                  style={{
+                    flex: 1,
+                    borderRadius: "12px",
+                    border: selected ? "1px solid var(--brand)" : "1px solid var(--glass-border)",
+                    background: selected ? "var(--brand-soft)" : "var(--surface)",
+                    color: "var(--text-primary)",
+                    padding: "10px 12px",
+                    fontWeight: selected ? 700 : 600,
+                    cursor: savingGender ? "not-allowed" : "pointer",
+                    opacity: savingGender ? 0.8 : 1,
+                  }}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {genderError ? (
+            <p style={{ marginTop: "10px", color: "var(--status-error)", fontSize: "12px" }}>{genderError}</p>
+          ) : null}
+        </div>
+
+        <div className="glass-card fade-in fade-in-delay-2" style={{ padding: "20px 24px", marginBottom: "16px" }}>
           <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "14px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
             {t.stats}
           </p>
@@ -185,8 +230,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Quick Links */}
-        <div className="glass-card fade-in fade-in-delay-2" style={{ padding: "8px" }}>
+        <div className="glass-card fade-in fade-in-delay-3" style={{ padding: "8px" }}>
           <Link
             href="/history"
             style={{
