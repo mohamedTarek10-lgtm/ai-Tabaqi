@@ -8,8 +8,8 @@
   "display": "standalone",
   "lang": "ar-EG",
   "dir": "rtl",
-  "background_color": "#06040f",
-  "theme_color": "#06040f",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "orientation": "portrait-primary",
   "icons": [
     {

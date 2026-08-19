@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import sharp from "sharp";
 
 import { db, isDatabaseConfigured } from "@/config/db";
 import { meals } from "@/db/schema";
@@ -7,7 +8,7 @@ import { eq, and, gte, count } from "drizzle-orm";
 
 export const runtime = "nodejs";
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const OPENROUTER_TIMEOUT_MS = 45_000;
 const FALLBACK_MODEL = "google/gemini-2.5-flash";
 const PROVIDER_IMAGE_TYPES = new Set([
@@ -15,6 +16,8 @@ const PROVIDER_IMAGE_TYPES = new Set([
   "image/png",
   "image/webp",
   "image/gif",
+  "image/heic",
+  "image/heif",
 ]);
 
 // ── Rate limit constants ────────────────────────────────────────────────────
@@ -265,6 +268,21 @@ function extractJson(text) {
   return cleaned;
 }
 
+async function normalizeImageForOpenRouter(sourceBuffer, detectedMimeType) {
+  const supported = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"]);
+  if (!supported.has(detectedMimeType || "")) {
+    throw new Error("Unsupported image type");
+  }
+
+  const normalized = await sharp(Buffer.from(sourceBuffer))
+    .rotate()
+    .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 80, mozjpeg: true, progressive: true })
+    .toBuffer();
+
+  return { mimeType: "image/jpeg", buffer: normalized };
+}
+
 function finiteNumber(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -457,30 +475,27 @@ export async function POST(req) {
     const bytes = await image.arrayBuffer();
     const detectedMimeType = detectImageType(new Uint8Array(bytes));
 
-    if (!detectedMimeType) {
+    if (!detectedMimeType || !PROVIDER_IMAGE_TYPES.has(detectedMimeType)) {
       return NextResponse.json(
-        { error: "الملف ده مش صورة مدعومة. اختار JPG أو PNG أو WEBP." },
+        { error: "الملف ده مش صورة مدعومة. اختار JPG أو PNG أو WEBP أو HEIC/HEIF." },
         { status: 415 }
       );
     }
 
-    if (detectedMimeType === "image/heic") {
+    let normalizedImage;
+    try {
+      normalizedImage = await normalizeImageForOpenRouter(bytes, detectedMimeType);
+    } catch (conversionError) {
+      console.error("[Luqmati] Image normalization failed:", conversionError);
       return NextResponse.json(
-        { error: "صيغة HEIC/HEIF محتاجة تحويل. افتح الصورة من جهازك أو حوّلها لـJPG وحاول تاني." },
-        { status: 415 }
-      );
-    }
-
-    if (!PROVIDER_IMAGE_TYPES.has(detectedMimeType)) {
-      return NextResponse.json(
-        { error: "صيغة الصورة دي مش مدعومة للتحليل. اختار JPG أو PNG أو WEBP." },
+        { error: "فشل تحويل الصورة للتنسيق المناسب. جرّب صورة أوضح." },
         { status: 415 }
       );
     }
 
     // ── 7. Convert image to Base64 ───────────────────────────────────────────
-    const base64 = Buffer.from(bytes).toString("base64");
-    const mimeType = detectedMimeType;
+    const base64 = Buffer.from(normalizedImage.buffer).toString("base64");
+    const mimeType = normalizedImage.mimeType;
 
     // ── 8. Send to OpenRouter with a narrowly-scoped model fallback ───────────
     const apiKey = process.env.OPENROUTER_API_KEY;

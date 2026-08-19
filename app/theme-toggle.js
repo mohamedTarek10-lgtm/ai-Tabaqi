@@ -37,7 +37,7 @@ export default function ThemeToggle() {
     }
     root.dataset.theme = next;
     const themeMeta = document.getElementById("theme-color-meta");
-    if (themeMeta) themeMeta.setAttribute("content", next === "dark" ? "#06040f" : "#f0f0fa");
+    if (themeMeta) themeMeta.setAttribute("content", next === "dark" ? "#000000" : "#f5f7f3");
     // Keep the canvas/CSS background in sync with the explicit theme toggle.
     window.dispatchEvent(new CustomEvent("luqmati:theme", { detail: { theme: next } }));
   }
