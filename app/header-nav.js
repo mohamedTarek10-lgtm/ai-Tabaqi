@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+import { SignInButton, SignUpButton, Show, useUser } from "@clerk/nextjs";
 import ThemeToggle from "./theme-toggle";
 import { useLang } from "./i18n-context";
+import { ProfileAvatarBadge } from "./profile-avatar";
 
 export function HeaderNav() {
   const pathname = usePathname();
+  const { user } = useUser();
   const { lang, t, toggleLang } = useLang();
+  const profileGender = user?.publicMetadata?.gender === "female" ? "female" : "male";
 
   const navLinkStyle = (path) => ({
     fontSize: "14px",
@@ -37,9 +40,9 @@ export function HeaderNav() {
             {lang === "ar" ? "EN" : "عربي"}
           </button>
           <ThemeToggle />
-          <Show when="signed-in">
-            <UserButton />
-          </Show>
+          <Link href="/profile" aria-label="Profile" style={{ display: "inline-flex" }}>
+            <ProfileAvatarBadge gender={profileGender} size={36} />
+          </Link>
         </div>
       </header>
 
@@ -94,7 +97,9 @@ export function HeaderNav() {
             </SignUpButton>
           </Show>
           <Show when="signed-in">
-            <UserButton />
+            <Link href="/profile" aria-label="Profile" style={{ display: "inline-flex" }}>
+              <ProfileAvatarBadge gender={profileGender} size={36} />
+            </Link>
           </Show>
         </div>
       </header>

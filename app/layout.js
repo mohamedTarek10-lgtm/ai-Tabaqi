@@ -135,8 +135,8 @@ export default function RootLayout({ children }) {
     <html lang="ar" dir="rtl" suppressHydrationWarning className={[inter.variable, arabicBrand.variable, metana.variable].join(" ")} style={{ scrollBehavior: "smooth" }}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta id="theme-color-meta" name="theme-color" content="#06040f" />
-        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f0f0fa" />
+        <meta id="theme-color-meta" name="theme-color" content="#000000" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f7f3" />
         <Script
           id="json-ld"
           type="application/ld+json"
