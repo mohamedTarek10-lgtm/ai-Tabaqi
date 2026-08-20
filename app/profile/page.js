@@ -3,8 +3,8 @@
 import { useUser, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useLang } from "../i18n-context";
-import { ProfileAvatarBadge } from "../profile-avatar";
+import { useLang } from "../../hooks/i18n-context";
+import { ProfileAvatarBadge } from "../../components/profile-avatar";
 
 export default function ProfilePage() {
   const { user, isLoaded, isSignedIn } = useUser();

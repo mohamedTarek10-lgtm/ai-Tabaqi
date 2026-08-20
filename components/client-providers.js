@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import RibbonBackground from "./ribbon-background";
-import { LangProvider } from "./i18n-context";
+import { LangProvider } from "../hooks/i18n-context";
 
 function subscribeToTheme(callback) {
   window.addEventListener("luqmati:theme", callback);

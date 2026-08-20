@@ -2,14 +2,13 @@
 
 import { useState, useRef, useCallback, useEffect, useSyncExternalStore, memo } from "react";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useLang } from "./i18n-context";
-import EditableIngredients from "./editable-ingredients";
+import { useLang } from "../hooks/i18n-context";
+import EditableIngredients from "../components/editable-ingredients";
 
-const InstallPrompt = dynamic(() => import("./install-prompt"), { ssr: false });
-const ProteinRing = dynamic(() => import("./protein-ring"));
+const InstallPrompt = dynamic(() => import("../components/install-prompt"), { ssr: false });
+const ProteinRing = dynamic(() => import("../components/protein-ring"));
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const PROVIDER_IMAGE_TYPES = new Set([
@@ -173,9 +172,6 @@ export default function Home() {
   const [usage, setUsage] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [inputTab, setInputTab] = useState("file");
-  const [urlInput, setUrlInput] = useState("");
-  const [urlFetching, setUrlFetching] = useState(false);
   // Guest trial: true = guest result shown (not saved yet)
   const [isGuestResult, setIsGuestResult] = useState(false);
   const isOffline = !useSyncExternalStore(subscribeToOnlineStatus, getOnlineStatus, () => true);
@@ -204,7 +200,7 @@ export default function Home() {
 
   // ── File validation & handle ─────────────────────────────────────────────
   const handleFile = useCallback(async function handleFile(f) {
-    if (!f || (!f.type.startsWith("image/") && !IMAGE_EXTENSIONS.test(f.name))) {
+    if (!f) {
       setError(t.notAnImage);
       return;
     }
@@ -230,24 +226,6 @@ export default function Home() {
     }
   }, [t]);
 
-  const handleUrlSubmit = async (e) => {
-    e?.preventDefault();
-    if (!urlInput.trim()) return;
-    try {
-      setUrlFetching(true);
-      setError("");
-      const preparedFile = await convertToProviderImage(urlInput.trim());
-      setFile(preparedFile);
-      setPreview(URL.createObjectURL(preparedFile));
-      setResult(null);
-      setSaved(false);
-      setRateLimitInfo(null);
-    } catch (err) {
-      setError(err.message === "url_fetch_failed" ? (t.urlError || "تعذر جلب الصورة من الرابط.") : t.imageConversionFailed);
-    } finally {
-      setUrlFetching(false);
-    }
-  };
 
   const onFileInput = (e) => {
     void handleFile(e.target.files?.[0]);
@@ -409,7 +387,6 @@ export default function Home() {
     setError("");
     setSaved(false);
     setRateLimitInfo(null);
-    setUrlInput("");
     if (fileInput.current) fileInput.current.value = "";
     if (cameraInput.current) cameraInput.current.value = "";
   }
@@ -504,6 +481,9 @@ export default function Home() {
                 fontSize: "28px",
                 fontWeight: 700,
                 color: "var(--brand)",
+                display:flex,
+                justifyItems: "center",
+                
               }}
             >
               لقمتي
@@ -547,98 +527,9 @@ export default function Home() {
             {t.heroSubtitle}
           </p>
 
-          {/* Mode Switcher Tabs */}
-          {!preview && (
-            <div
-              style={{
-                display: "flex",
-                gap: "6px",
-                marginBottom: "20px",
-                background: "var(--bg-subtle)",
-                padding: "4px",
-                borderRadius: "12px",
-                width: "100%",
-                maxWidth: "360px",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setInputTab("file")}
-                style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: inputTab === "file" ? "var(--brand)" : "transparent",
-                  color: inputTab === "file" ? "#ffffff" : "var(--text-primary)",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-              >
-                📁 {t.tabFile || "رفع صورة"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setInputTab("url")}
-                style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: inputTab === "url" ? "var(--brand)" : "transparent",
-                  color: inputTab === "url" ? "#ffffff" : "var(--text-primary)",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-              >
-                🔗 {t.tabUrl || "رابط صورة"}
-              </button>
-            </div>
-          )}
 
           {/* Upload Zone / URL Form / Image Preview */}
-          {inputTab === "url" && !preview ? (
-            <form
-              onSubmit={handleUrlSubmit}
-              style={{
-                width: "100%",
-                display: "flex",
-                flexDirection: "column",
-                gap: "12px",
-                marginBottom: "24px",
-              }}
-            >
-              <input
-                type="url"
-                placeholder={t.urlPlaceholder || "ضع رابط الصورة هنا (https://...)"}
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                required
-                style={{
-                  width: "100%",
-                  height: "48px",
-                  padding: "0 16px",
-                  borderRadius: "12px",
-                  border: "1px solid var(--glass-border)",
-                  background: "var(--glass)",
-                  color: "var(--text-primary)",
-                  fontSize: "13px",
-                }}
-              />
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={urlFetching || !urlInput.trim()}
-                style={{ height: "48px", fontSize: "14px" }}
-              >
-                {urlFetching ? (t.preparingImage || "جاري جلب الصورة...") : (t.btnUrlLoad || "جلب وتجهيز الصورة")}
-              </button>
-            </form>
-          ) : !preview ? (
+          {!preview ? (
             <div
               className={`upload-zone ${dragOver ? "drag-active" : ""}`}
               style={{
@@ -708,12 +599,11 @@ export default function Home() {
                 position: "relative",
               }}
             >
-              <Image
+              <img
                 src={preview}
                 alt="food preview"
                 width={600}
                 height={260}
-                unoptimized
                 decoding="async"
                 style={{
                   width: "100%",
@@ -766,14 +656,14 @@ export default function Home() {
           <input
             ref={fileInput}
             type="file"
-            accept="image/*,.heic,.heif,.avif,.bmp"
+                      accept="image/*"
             onChange={onFileInput}
             style={{ display: "none" }}
           />
           <input
             ref={cameraInput}
             type="file"
-            accept="image/*,.heic,.heif,.avif,.bmp"
+                      accept="image/*"
             capture="environment"
             onChange={onFileInput}
             style={{ display: "none" }}
@@ -1015,12 +905,11 @@ export default function Home() {
           {/* Header image & badges */}
           {preview && (
             <div style={{ position: "relative" }}>
-              <Image
+              <img
                 src={preview}
                 alt={result.foodNameArabic || result.foodName}
                 width={520}
                 height={230}
-                unoptimized
                 decoding="async"
                 style={{
                   width: "100%",
@@ -1125,8 +1014,8 @@ export default function Home() {
                 flexDirection: "column",
                 alignItems: "center",
                 background:
-                  "linear-gradient(135deg, rgb(167 139 250 / 0.12), rgb(236 72 153 / 0.08))",
-                borderColor: "rgb(167 139 250 / 0.25)",
+                  "linear-gradient(135deg, var(--brand), var(--brand-strong))",
+                                  borderColor: "var(--brand-soft)",
               }}
             >
               <ProteinRing

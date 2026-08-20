@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useLang } from "./i18n-context";
+import { useLang } from "../hooks/i18n-context";
 
 import AthleticProfileIcon from "./athletic-profile-icon";
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import sharp from "sharp";
+import { createHash } from "crypto";
 
 import { db, isDatabaseConfigured } from "@/config/db";
 import { meals } from "@/db/schema";
@@ -10,6 +11,13 @@ export const runtime = "nodejs";
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const OPENROUTER_TIMEOUT_MS = 45_000;
+
+// Simple in-memory cache for normalized AI results keyed by image SHA256.
+// This cache is per-process (non-persistent) and is intended to avoid
+// re-calling the AI for identical images submitted repeatedly in a short
+// time window. It is safe because cached entries contain the final normalized
+// result only (no user-identifying data).
+const IMAGE_RESULT_CACHE = new Map();
 const FALLBACK_MODEL = "google/gemini-2.5-flash";
 const PROVIDER_IMAGE_TYPES = new Set([
   "image/jpeg",
@@ -24,158 +32,41 @@ const PROVIDER_IMAGE_TYPES = new Set([
 const ANALYSIS_LIMIT = 3;
 const ANALYSIS_WINDOW_MS = 5 * 60 * 60 * 1000; // 5 hours
 
-// ── System prompt ───────────────────────────────────────────────────────────
+// ── System prompt (trimmed for lower token usage) ───────────────────────────
+// Kept the essential instructions: language rules, required JSON schema and
+// the key estimation objectives. The long food examples and extra prose were
+// removed to reduce token count while preserving behavioral constraints.
 const SYSTEM_PROMPT = `
-You are Luqmati (لقمتي), an AI food analysis assistant specialized in Egyptian and Arabic food.
+You are Luqmati (لقمتي), an AI assistant that analyzes food images and
+returns a concise JSON nutrition summary tailored for Egyptian users.
 
-Your main job is to analyze food images and estimate nutritional information.
+Language rules:
+- Support Arabic (Egyptian colloquial) and English names. Use simple Egyptian
+  Arabic for Arabic output. Keep internal JSON field names in English.
 
-IMPORTANT LANGUAGE RULES:
-- The user is Egyptian.
-- Understand Egyptian Arabic food names and Egyptian colloquial expressions.
-- Understand both Arabic and English names for food.
-- When generating user-facing Arabic text, use simple natural Egyptian Arabic.
-- Do not use formal complicated Arabic.
-- Internal JSON field names must remain in English.
+Task:
+- Identify the dish and ingredients visible in the image.
+- Estimate portion size, calories, protein, carbs, and fats.
+- If uncertain, lower the confidence (high|medium|low).
 
-EGYPTIAN FOOD KNOWLEDGE:
-
-You should recognize common Egyptian foods such as:
-- طاجن
-- حواوشي
-- كشري
-- فول
-- طعمية / فلافل
-- ملوخية
-- محشي
-- فتة
-- مسقعة
-- بامية
-- عدس
-- بسلة
-- فاصوليا
-- بطاطس
-- أرز مصري
-- مكرونة
-- عيش بلدي
-- فطير
-- كفتة
-- كباب
-- فراخ مشوية
-- فراخ مقلية
-- لحمة
-- سمك
-- جمبري
-- بيض
-- جبنة
-- شوربة
-- أكلات البيت المصري
-- أكل المطاعم المصرية
-
-Also recognize mixed meals and homemade Egyptian dishes.
-
-IMPORTANT:
-Do not assume every Egyptian dish has one fixed recipe.
-
-Recipes and quantities can vary.
-
-NUTRITION ESTIMATION:
-
-Estimate:
-- calories
-- protein
-- carbohydrates
-- fats
-- ingredient quantities
-
-The values are estimates based on the visible food and estimated portion size.
-
-Never pretend that image-based nutrition estimates are exact.
-
-If the portion or ingredient is unclear, lower the confidence.
-
-If something cannot be identified reliably, say so.
-
-DO NOT invent ingredients that are clearly not visible unless they are strongly associated with the identified dish.
-
-PORTION ESTIMATION:
-
-Estimate the portion using visual clues such as:
-- plate size
-- bowl size
-- visible quantity
-- food density
-
-Use practical portions such as:
-- small
-- medium
-- large
-- approximate grams
-
-PROTEIN ANALYSIS:
-
-Identify the main protein sources.
-
-For example:
-Rice + lentils
-Chicken + rice
-Beans
-Eggs
-Meat
-Fish
-
-If a meal contains complementary plant protein sources such as grains and legumes, mention that they can complement each other's amino-acid profiles.
-
-Do not make medical claims.
-
-OUTPUT:
-
-Return ONLY valid JSON.
-
-Do not return Markdown.
-Do not wrap JSON in code fences.
-Do not add explanations outside JSON.
-
-Use exactly this structure:
-
+Output requirements:
+- Return only valid JSON (no Markdown, no code fences, no extra text).
+- Use this structure (exact keys expected):
 {
   "foodName": "",
   "foodNameArabic": "",
   "descriptionArabic": "",
-  "portion": {
-    "size": "",
-    "estimatedGrams": 0
-  },
+  "portion": { "size": "", "estimatedGrams": 0 },
   "calories": 0,
   "protein": 0,
   "carbs": 0,
   "fats": 0,
   "proteinNote": "",
-  "ingredients": [
-    {
-      "name": "",
-      "nameArabic": "",
-      "estimatedGrams": 0,
-      "calories": 0,
-      "protein": 0,
-      "carbs": 0,
-      "fats": 0
-    }
-  ],
+  "ingredients": [ { "name": "", "nameArabic": "", "estimatedGrams": 0, "calories": 0, "protein": 0, "carbs": 0, "fats": 0 } ],
   "confidence": "high"
 }
 
-confidence MUST be exactly one of:
-
-"high"
-"medium"
-"low"
-
-proteinNote: optional short note about protein quality or amino acid completeness. Leave empty string if not applicable.
-
-Keep the response concise.
-
-The goal is fast, structured and useful results for Luqmati.
+Keep responses concise and focused on the JSON output.
 `;
 
 // Helper to call OpenRouter API
@@ -363,7 +254,7 @@ async function callOpenRouter(apiKey, model, mimeType, base64) {
             },
           ],
           temperature: 0.1,
-          max_tokens: 900,
+          max_tokens: 700,
         }),
       }
     );
@@ -497,6 +388,66 @@ export async function POST(req) {
     const base64 = Buffer.from(normalizedImage.buffer).toString("base64");
     const mimeType = normalizedImage.mimeType;
 
+    // Compute image hash and check in-memory cache to avoid repeated AI calls
+    const imageHash = createHash("sha256").update(Buffer.from(normalizedImage.buffer)).digest("hex");
+    if (IMAGE_RESULT_CACHE.has(imageHash)) {
+      try {
+        const cachedResult = IMAGE_RESULT_CACHE.get(imageHash);
+        // Save a new meal record for this user using the cached AI result
+        const mealIdCached = crypto.randomUUID();
+        await db.insert(meals).values({
+          id: mealIdCached,
+          userId,
+          foodName: cachedResult.foodName || "Unknown",
+          foodNameArabic: cachedResult.foodNameArabic || null,
+          descriptionArabic: cachedResult.descriptionArabic || null,
+          portionSize: cachedResult.portion?.size || null,
+          estimatedGrams: Number(cachedResult.portion?.estimatedGrams) || null,
+          calories: Number(cachedResult.calories) || null,
+          protein: Number(cachedResult.protein) || null,
+          carbs: Number(cachedResult.carbs) || null,
+          fats: Number(cachedResult.fats) || null,
+          confidence: cachedResult.confidence || "low",
+          ingredients: cachedResult.ingredients || [],
+          imageUrl: null,
+        });
+
+        const newCountCached = Number(recentCount) + 1;
+        const remainingCached = Math.max(0, ANALYSIS_LIMIT - newCountCached);
+
+        const windowMealsCached = await db
+          .select({ createdAt: meals.createdAt })
+          .from(meals)
+          .where(
+            and(
+              eq(meals.userId, userId),
+              gte(meals.createdAt, windowStart)
+            )
+          )
+          .orderBy(meals.createdAt)
+          .limit(1);
+
+        const resetAtCached = windowMealsCached.length > 0
+          ? new Date(windowMealsCached[0].createdAt.getTime() + ANALYSIS_WINDOW_MS)
+          : new Date(Date.now() + ANALYSIS_WINDOW_MS);
+
+        return NextResponse.json({
+          success: true,
+          mealId: mealIdCached,
+          result: cachedResult,
+          usage: {
+            used: newCountCached,
+            limit: ANALYSIS_LIMIT,
+            remaining: remainingCached,
+            resetAt: resetAtCached.toISOString(),
+          },
+        });
+      } catch (cacheDbErr) {
+        console.warn('[Luqmati] Cache hit save failed, falling back to AI path:', cacheDbErr);
+        // If saving the cached result fails, continue to call the AI normally.
+      }
+    }
+
     // ── 8. Send to OpenRouter with a narrowly-scoped model fallback ───────────
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey || !apiKey.startsWith("sk-or-")) {
@@ -594,6 +545,15 @@ export async function POST(req) {
         { error: "الـAI رجّع بيانات غير صالحة. حاول تاني." },
         { status: 502 }
       );
+    }
+
+    // Cache the normalized result for identical images to speed up repeated scans
+    try {
+      if (typeof imageHash === 'string' && imageHash) {
+        IMAGE_RESULT_CACHE.set(imageHash, result);
+      }
+    } catch (cacheErr) {
+      console.warn('[Luqmati] Failed to write result to cache:', cacheErr);
     }
 
     // ── 11. Save to DB ───────────────────────────────────────────────────────

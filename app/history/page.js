@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useAuth, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { useLang } from "../i18n-context";
+import { useLang } from "../../hooks/i18n-context";
 
 // Group meals by relative date label
 function groupByDate(meals, t, lang) {
@@ -215,7 +215,7 @@ export default function HistoryPage() {
                     <div
                       className="meal-thumbnail"
                       style={{
-                        background: "linear-gradient(135deg, rgba(108,63,212,0.18), rgba(236,72,153,0.12))",
+                        background: "linear-gradient(135deg, var(--brand), var(--brand-strong))",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",

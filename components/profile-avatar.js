@@ -33,7 +33,38 @@ export function ProfileAvatarIcon({ gender = "male", className = "" }) {
   );
 }
 
-export function ProfileAvatarBadge({ gender = "male", size = 42, className = "" }) {
+export function ProfileAvatarBadge({ gender = "male", size = 42, className = "", src = null }) {
+  // If a src is provided (from Clerk user), render the image. Fall back to
+  // the SVG avatar icons preserving original styling.
+  if (src) {
+    return (
+      <div
+        className={className}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "9999px",
+          background: "var(--surface)",
+          color: "var(--foreground)",
+          display: "grid",
+          placeItems: "center",
+          border: "1px solid var(--glass-border)",
+          boxShadow: "0 8px 18px rgba(0, 0, 0, 0.12)",
+          overflow: "hidden",
+        }}
+      >
+        <img
+          src={src}
+          alt="Profile"
+          width={size}
+          height={size}
+          decoding="async"
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={className}

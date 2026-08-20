@@ -3,9 +3,9 @@ import { Inter } from "next/font/google";
 import localFont from "next/font/local";
 import Script from "next/script";
 import "./globals.css";
-import ClientProviders from "./client-providers";
-import { HeaderNav, FooterBranding } from "./header-nav";
-import MobileNavigation from "./mobile-navigation";
+import ClientProviders from "../components/client-providers";
+import { HeaderNav, FooterBranding } from "../components/header-nav";
+import MobileNavigation from "../components/mobile-navigation";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -161,22 +161,24 @@ export default function RootLayout({ children }) {
           </ClientProviders>
         </ClerkProvider>
 
-        {/* Register Service Worker for PWA & Offline Support using Next.js Script */}
-        <Script
-          id="register-sw"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
-                    console.log('SW registration failed: ', err);
-                  });
-                });
-              }
-            `,
-          }}
-        />
+        {/* Register Service Worker for PWA & Offline Support. In production register; in development unregister any existing service workers to avoid stale assets. */}
+        {process.env.NODE_ENV === 'production' ? (
+          <Script
+            id="register-sw"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `if ('serviceWorker' in navigator) { window.addEventListener('load', function() { navigator.serviceWorker.register('/sw.js').catch(function(err) { console.log('SW registration failed: ', err); }); }); }`,
+            }}
+          />
+        ) : (
+          <Script
+            id="unregister-sw-dev"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister())).catch(()=>{}); }`,
+            }}
+          />
+        )}
       </body>
     </html>
   );

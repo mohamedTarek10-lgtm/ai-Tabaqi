@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignInButton, SignUpButton, Show, useUser } from "@clerk/nextjs";
 import ThemeToggle from "./theme-toggle";
-import { useLang } from "./i18n-context";
+import { useLang } from "../hooks/i18n-context";
 import { ProfileAvatarBadge } from "./profile-avatar";
 
 export function HeaderNav() {
@@ -41,7 +41,7 @@ export function HeaderNav() {
           </button>
           <ThemeToggle />
           <Link href="/profile" aria-label="Profile" style={{ display: "inline-flex" }}>
-            <ProfileAvatarBadge gender={profileGender} size={36} />
+            <ProfileAvatarBadge gender={profileGender} size={36} src={user?.profileImageUrl || user?.imageUrl || user?.profile_image_url} />
           </Link>
         </div>
       </header>
@@ -98,7 +98,7 @@ export function HeaderNav() {
           </Show>
           <Show when="signed-in">
             <Link href="/profile" aria-label="Profile" style={{ display: "inline-flex" }}>
-              <ProfileAvatarBadge gender={profileGender} size={36} />
+              <ProfileAvatarBadge gender={profileGender} size={36} src={user?.profileImageUrl || user?.imageUrl || user?.profile_image_url} />
             </Link>
           </Show>
         </div>
@@ -112,15 +112,15 @@ export function FooterBranding() {
     <footer className="site-footer">
       <span>© {new Date().getFullYear()} لقمتي / Luqmati</span>
       <a
-        href="https://github.com"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="footer-mt"
-        title="Created by MT"
-        aria-label="MT Developer Signature"
-      >
-        MT
-      </a>
+  href="https://github.com/mohamedTarek10-lgtm"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="footer-mt"
+  title="Created by MT"
+  aria-label="MT Developer Signature"
+>
+  MT
+</a>
     </footer>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useSyncExternalStore } from "react";
-import { useLang } from "./i18n-context";
+import { useLang } from "../hooks/i18n-context";
 
 export default function InstallPrompt() {
   const { t, lang } = useLang();
@@ -85,8 +85,8 @@ export default function InstallPrompt() {
               justifyContent: "space-between",
               gap: "12px",
               background:
-                "linear-gradient(135deg, rgb(108 63 212 / 0.16), rgb(236 72 153 / 0.12))",
-              borderColor: "rgb(167 139 250 / 0.3)",
+               "linear-gradient(135deg, var(--brand), var(--brand-strong))",
+              borderColor: "var(--brand-soft)",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -101,7 +101,7 @@ export default function InstallPrompt() {
                   placeItems: "center",
                   fontSize: "18px",
                   flexShrink: 0,
-                  boxShadow: "0 4px 12px rgb(108 63 212 / 0.3)",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.10)",
                 }}
               >
                 📱
