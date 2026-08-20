@@ -475,19 +475,8 @@ export default function Home() {
               marginBottom: "16px",
             }}
           >
-            <span
-              className="font-arabic"
-              style={{
-                fontSize: "28px",
-                fontWeight: 700,
-                color: "var(--brand)",
-                display:flex,
-                justifyItems: "center",
-                
-              }}
-            >
-              لقمتي
-            </span>
+            
+            
 
             {usage && (
               <div className="usage-counter">
