@@ -7,7 +7,7 @@ import ThemeToggle from "./theme-toggle";
 import { useLang } from "../hooks/i18n-context";
 import { ProfileAvatarBadge } from "./profile-avatar";
 
-export function HeaderNav() {
+export function HeaderNav({ isAdmin = false }) {
   const pathname = usePathname();
   const { user } = useUser();
   const { lang, t, toggleLang } = useLang();
@@ -61,6 +61,7 @@ export function HeaderNav() {
           <Link href="/" style={navLinkStyle("/")}>{t.home}</Link>
           <Link href="/history" style={navLinkStyle("/history")}>{t.history}</Link>
           <Link href="/profile" style={navLinkStyle("/profile")}>{t.profile}</Link>
+          {isAdmin ? <Link href="/admin" style={navLinkStyle("/admin")}>Admin</Link> : null}
         </nav>
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>

@@ -46,3 +46,17 @@ export const meals = pgTable(
     index("meals_user_created_idx").on(table.userId, table.createdAt),
   ]
 );
+
+export const visits = pgTable(
+  "visits",
+  {
+    id: text("id").primaryKey(),
+    visitorHash: text("visitor_hash").notNull(),
+    path: text("path").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("visits_hash_created_idx").on(table.visitorHash, table.createdAt),
+    index("visits_path_created_idx").on(table.path, table.createdAt),
+  ]
+);

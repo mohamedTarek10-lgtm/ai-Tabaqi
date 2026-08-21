@@ -1,4 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 import { Inter } from "next/font/google";
 import localFont from "next/font/local";
 import Script from "next/script";
@@ -6,6 +7,8 @@ import "./globals.css";
 import ClientProviders from "../components/client-providers";
 import { HeaderNav, FooterBranding } from "../components/header-nav";
 import MobileNavigation from "../components/mobile-navigation";
+import TrackVisit from "../components/track-visit";
+import { isAdminUser } from "@/lib/auth/isAdmin";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -37,9 +40,6 @@ const metana = localFont({
 });
 
 export const metadata = {
-  verification: {
-    google: "tQuHl7PaMtPtA0W1vUPDpH3JeK3RY71DOMQi99ZF9gE",
-  },
   title: {
     default: "لقمتي / Luqmati — تحليل السعرات والماكروز بالذكاء الاصطناعي",
     template: "%s | لقمتي Luqmati",
@@ -114,7 +114,7 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
@@ -130,6 +130,9 @@ export default function RootLayout({ children }) {
       priceCurrency: "EGP",
     },
   };
+
+  const currentAuth = await auth();
+  const isAdmin = currentAuth.userId ? await isAdminUser(currentAuth) : false;
 
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning className={[inter.variable, arabicBrand.variable, metana.variable].join(" ")} style={{ scrollBehavior: "smooth" }}>
@@ -147,22 +150,19 @@ export default function RootLayout({ children }) {
       <body>
         <ClerkProvider>
           <ClientProviders>
-            <HeaderNav />
+            <HeaderNav isAdmin={isAdmin} />
+            <TrackVisit />
 
-            {/* Main Wrapper */}
             <div className="page-wrapper" style={{ position: "relative", zIndex: 1, minHeight: "100dvh" }}>
               {children}
             </div>
 
             <FooterBranding />
-
-            {/* Mobile Bottom Navigation */}
-            <MobileNavigation />
+            <MobileNavigation isAdmin={isAdmin} />
           </ClientProviders>
         </ClerkProvider>
 
-        {/* Register Service Worker for PWA & Offline Support. In production register; in development unregister any existing service workers to avoid stale assets. */}
-        {process.env.NODE_ENV === 'production' ? (
+        {process.env.NODE_ENV === "production" ? (
           <Script
             id="register-sw"
             strategy="afterInteractive"

@@ -88,6 +88,8 @@ const strings = {
     notAnImage: "الملف ده مش صورة. اختار صورة تاني.",
     analysisError: "حصلت مشكلة أثناء التحليل، جرّب تاني.",
     analysisTimeout: "التحليل أخد وقت أطول من اللازم. جرّب تاني بصورة أوضح.",
+    analysisBusy: "خدمة التحليل مشغولة حاليًا. جرّب بعد دقيقة أو حاول صورة أبسط.",
+    analysisRateLimit: "وصلت للحد اليومي للتحليلات. جرّب بعد فترة أو سجل دخولك مرة تانية.",
     imageConversionFailed: "الصيغة دي مش مدعومة على جهازك. حوّل الصورة لـJPG أو PNG وحاول تاني.",
     btnRetry: "حاول تاني",
 
@@ -193,6 +195,8 @@ const strings = {
     notAnImage: "That file is not an image. Choose a different file.",
     analysisError: "Something went wrong during analysis, please try again.",
     analysisTimeout: "Analysis took too long. Try again with a clearer photo.",
+    analysisBusy: "The analysis service is busy right now. Please try again in a minute or use a simpler image.",
+    analysisRateLimit: "You reached the daily analysis limit. Please wait a bit and try again or sign in again.",
     imageConversionFailed: "This image format isn't supported on your device. Convert to JPG or PNG and try again.",
     btnRetry: "Try Again",
 

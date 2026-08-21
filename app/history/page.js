@@ -211,41 +211,43 @@ export default function HistoryPage() {
               {groups[label].map((meal) => {
                 const time = new Date(meal.createdAt).toLocaleTimeString(lang === "ar" ? "ar-EG" : "en-US", { hour: "2-digit", minute: "2-digit" });
                 return (
-                  <div key={meal.id} className="meal-row">
-                    <div
-                      className="meal-thumbnail"
-                      style={{
-                        background: "linear-gradient(135deg, var(--brand), var(--brand-strong))",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "24px",
-                      }}
-                    >
-                      🍽️
-                    </div>
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontWeight: 700, fontSize: "15px", color: "var(--text-primary)", marginBottom: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {lang === "ar" ? (meal.foodNameArabic || meal.foodName) : (meal.foodName || meal.foodNameArabic)}
-                      </p>
-
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--text-secondary)" }}>
-                        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: confColor(meal.confidence), flexShrink: 0 }} />
-                        <span className="english-font">{meal.calories ?? "—"} {t.kcal}</span>
-                        <span>·</span>
-                        <span>{time}</span>
+                  <Link key={meal.id} href={`/history/${meal.id}`} style={{ textDecoration: "none" }}>
+                    <div className="meal-row" style={{ cursor: "pointer" }}>
+                      <div
+                        className="meal-thumbnail"
+                        style={{
+                          background: "linear-gradient(135deg, var(--brand), var(--brand-strong))",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "24px",
+                        }}
+                      >
+                        🍽️
                       </div>
 
-                      {(meal.protein || meal.carbs || meal.fats) && (
-                        <div style={{ display: "flex", gap: "10px", marginTop: "6px", fontSize: "11px", fontWeight: 600 }}>
-                          {meal.protein && <span style={{ color: "var(--color-protein)" }}>💪 {meal.protein}g</span>}
-                          {meal.carbs   && <span style={{ color: "var(--color-carbs)"   }}>🍚 {meal.carbs}g</span>}
-                          {meal.fats    && <span style={{ color: "var(--color-fats)"    }}>🥑 {meal.fats}g</span>}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontWeight: 700, fontSize: "15px", color: "var(--text-primary)", marginBottom: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {lang === "ar" ? (meal.foodNameArabic || meal.foodName) : (meal.foodName || meal.foodNameArabic)}
+                        </p>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--text-secondary)" }}>
+                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: confColor(meal.confidence), flexShrink: 0 }} />
+                          <span className="english-font">{meal.calories ?? "—"} {t.kcal}</span>
+                          <span>·</span>
+                          <span>{time}</span>
                         </div>
-                      )}
+
+                        {(meal.protein || meal.carbs || meal.fats) && (
+                          <div style={{ display: "flex", gap: "10px", marginTop: "6px", fontSize: "11px", fontWeight: 600 }}>
+                            {meal.protein && <span style={{ color: "var(--color-protein)" }}>💪 {meal.protein}g</span>}
+                            {meal.carbs   && <span style={{ color: "var(--color-carbs)"   }}>🍚 {meal.carbs}g</span>}
+                            {meal.fats    && <span style={{ color: "var(--color-fats)"    }}>🥑 {meal.fats}g</span>}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

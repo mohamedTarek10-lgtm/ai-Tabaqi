@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useRef, useCallback, useEffect, useSyncExternalStore, memo } from "react";
 import dynamic from "next/dynamic";
 import { useAuth } from "@clerk/nextjs";
@@ -588,11 +589,12 @@ export default function Home() {
                 position: "relative",
               }}
             >
-              <img
+              <Image
                 src={preview}
                 alt="food preview"
                 width={600}
                 height={260}
+                unoptimized
                 decoding="async"
                 style={{
                   width: "100%",
@@ -894,11 +896,12 @@ export default function Home() {
           {/* Header image & badges */}
           {preview && (
             <div style={{ position: "relative" }}>
-              <img
+              <Image
                 src={preview}
                 alt={result.foodNameArabic || result.foodName}
                 width={520}
                 height={230}
+                unoptimized
                 decoding="async"
                 style={{
                   width: "100%",

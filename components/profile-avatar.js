@@ -33,6 +33,8 @@ export function ProfileAvatarIcon({ gender = "male", className = "" }) {
   );
 }
 
+import Image from "next/image";
+
 export function ProfileAvatarBadge({ gender = "male", size = 42, className = "", src = null }) {
   // If a src is provided (from Clerk user), render the image. Fall back to
   // the SVG avatar icons preserving original styling.
@@ -53,11 +55,12 @@ export function ProfileAvatarBadge({ gender = "male", size = 42, className = "",
           overflow: "hidden",
         }}
       >
-        <img
+        <Image
           src={src}
           alt="Profile"
           width={size}
           height={size}
+          unoptimized
           decoding="async"
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />

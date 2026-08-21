@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Luqmati
 
-## Getting Started
+This app is a Next.js food-analysis experience with Clerk auth, Neon/Postgres persistence, and OpenRouter AI analysis.
 
-First, run the development server:
+## Environment setup
+
+Create a `.env` file with the required values:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+DATABASE_URL=postgresql://...
+OPENROUTER_API_KEY=sk-or-...
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_your_live_key
+CLERK_SECRET_KEY=sk_live_your_live_key
+ADMIN_EMAILS=you@example.com,admin@example.com
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Important: before deployment, replace any test Clerk values (`pk_test_...` / `sk_test_...`) with the live production keys. The build will fail in production if a test publishable key is still configured.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## Admin access
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Set `ADMIN_EMAILS` to a comma-separated list of admin emails. Only users whose Clerk email matches one of these addresses can access `/admin` and see the analytics dashboard.
 
-## Learn More
+## Production key swap checklist
 
-To learn more about Next.js, take a look at the following resources:
+1. Copy the live keys from your Clerk dashboard.
+2. Update `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
+3. Restart the app and verify the browser no longer shows the development-key warning.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Local development
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm install
+npm run dev
+```
 
-## Deploy on Vercel
+The app runs at `http://localhost:3002` by default.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The app includes a global CSP, a secure admin redirect, and a non-invasive visit counter that hashes client IP + UA before storing a unique visitor hash.
+- The AI route compresses images client-side before sending to OpenRouter and applies a hard timeout plus retry logic for transient failures.

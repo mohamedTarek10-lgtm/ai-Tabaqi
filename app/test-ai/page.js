@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 
@@ -65,7 +66,7 @@ export default function TestAI() {
       <input type="file" accept="image/*" onChange={handleImageChange} />
       {preview && (
         <div style={{ marginTop: "20px" }}>
-          <img src={preview} alt="Food preview" width={300} height={200} decoding="async" style={{ width: "300px", maxWidth: "100%", borderRadius: "16px", height: "auto" }} />
+          <Image src={preview} alt="Food preview" width={300} height={200} unoptimized decoding="async" style={{ width: "300px", maxWidth: "100%", borderRadius: "16px", height: "auto" }} />
         </div>
       )}
       <button

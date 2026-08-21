@@ -23,7 +23,7 @@ function Icon({ name }) {
   );
 }
 
-export default function MobileNavigation() {
+export default function MobileNavigation({ isAdmin = false }) {
   const pathname = usePathname();
   const { t } = useLang();
 
@@ -31,6 +31,7 @@ export default function MobileNavigation() {
     { href: "/", label: t.home, icon: "home" },
     { href: "/history", label: t.history, icon: "history" },
     { href: "/profile", label: t.profile, icon: "profile" },
+    ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: "history" }] : []),
   ];
 
   return (
